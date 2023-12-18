@@ -12,6 +12,8 @@ public class QuadNode<T> {
     private QuadNode<T> NE = null;
     private QuadNode<T> SE = null;
     private QuadNode<T> SW = null;
+   //Counting leafs in the node
+    private int leafCount = 0;
     private final Box bounds;
 
     public QuadNode(double minX, double minY, double maxX, double maxY) {
@@ -22,6 +24,7 @@ public class QuadNode<T> {
         if (this.hasChildren) return getChild(leaf.x, leaf.y).put(leaf);
         if (this.leaf == null) {
             this.leaf = leaf;
+            this.leafCount++;  // Increment the counter for new added leaf
             return true;
         }
         if (this.leaf.x == leaf.x && this.leaf.y == leaf.y) {
@@ -42,14 +45,22 @@ public class QuadNode<T> {
     }
 
     public boolean remove(double x, double y, T value) {
-        if (this.hasChildren) return getChild(x, y).remove(x, y, value);
-        if (this.leaf != null && this.leaf.x == x && this.leaf.y == y) {
-            if (this.leaf.values.remove(value)) {
-                if (this.leaf.values.size() == 0) {
-                    this.leaf = null;
-                }
-                return true;
+        if (this.hasChildren) {
+            boolean removed = getChild(x, y).remove(x, y, value);
+            if (removed) {
+                this.leafCount--;  // Decrement the counter
             }
+            return removed;
+        }
+        if (this.leaf != null && this.leaf.x == x && this.leaf.y == y) {
+            boolean removed = this.leaf.values.remove(value);
+            if (removed) {
+                this.leafCount--;  // Decrement the counter
+                if (this.leaf.values.isEmpty()) {
+                    this.leaf = null;  // Remove the leaf if it's empty
+                }
+            }
+            return removed;
         }
         return false;
     }
@@ -75,6 +86,12 @@ public class QuadNode<T> {
                 this.leaf = null;
             }
         }
+        // Reset the leaf count to zero since all leaves have been cleared
+        this.leafCount = 0;
+    }
+    // Method to get the count of leaves in this node
+    public int getLeafCount() {
+        return leafCount;
     }
 
     public T get(double x, double y, AbstractDouble bestDistance) {
