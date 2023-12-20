@@ -78,6 +78,7 @@ public class QuadTree<T> {
         return get(new Box(minX, minY, maxX, maxY), values);
     }
 
+
     public int execute(Box bounds, Executor<T> executor) {
         if (bounds == null) {
             return this.root.execute(this.root.getBounds(), executor);
