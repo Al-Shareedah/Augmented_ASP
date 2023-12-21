@@ -79,7 +79,16 @@ public class Box {
 
         return Math.sqrt(distanceX * distanceX + distanceY * distanceY);
     }
-
+    public static int compareBoxes(Box a, Box b) {
+        double areaA = (a.maxX - a.minX) * (a.maxY - a.minY);
+        double areaB = (b.maxX - b.minX) * (b.maxY - b.minY);
+        return Double.compare(areaA, areaB);
+    }
+    public static boolean isSmaller(Box box1, Box box2) {
+        double area1 = (box1.maxX - box1.minX) * (box1.maxY - box1.minY);
+        double area2 = (box2.maxX - box2.minX) * (box2.maxY - box2.minY);
+        return area1 < area2;
+    }
     public Box scale(double scaleX, double scaleY) {
         scaleY *= this.centreY - this.minY;
         scaleX *= this.centreX - this.minX;
