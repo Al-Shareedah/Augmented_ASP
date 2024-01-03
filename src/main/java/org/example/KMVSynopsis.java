@@ -32,7 +32,7 @@ public class KMVSynopsis {
             tau++;
 
             // Update term synopses
-            List<String> associatedTerms = newObj.getAssociatedTerms();
+            Set<String> associatedTerms = newObj.getAssociatedTerms();
             for (String term : associatedTerms) {
                 termSynopses.putIfAbsent(term, new Synopsis());
                 termSynopses.get(term).addObject(newObj);

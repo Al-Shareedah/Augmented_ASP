@@ -43,7 +43,7 @@ public class CoordinateParser {
             while ((line = reader.readLine()) != null) {
                 if (isCoordinateLine(line)) {
                     if (textBuilder.length() > 0) {
-                        List<String> keywords = extractKeywords(textBuilder.toString(), "english"); // Change language as needed
+                        Set<String> keywords = extractKeywords(textBuilder.toString(), "english"); // Change language as needed
                         System.out.println("Coordinates: (" + x + ", " + y + "), Keywords: " + keywords);
                         textBuilder.setLength(0);
                     }
@@ -58,7 +58,7 @@ public class CoordinateParser {
             }
 
             if (textBuilder.length() > 0) {
-                List<String> keywords = extractKeywords(textBuilder.toString(), "english"); // Change language as needed
+                Set<String> keywords = extractKeywords(textBuilder.toString(), "english"); // Change language as needed
                 System.out.println("Coordinates: (" + x + ", " + y + "), Keywords: " + keywords);
 
             }
@@ -68,8 +68,8 @@ public class CoordinateParser {
             e.printStackTrace();
         }
     }
-    public static List<String> extractKeywords(String text, String language) {
-        List<String> keywords = new ArrayList<>();
+    public static Set<String> extractKeywords(String text, String language) {
+        Set<String> keywords = new HashSet<>();
         Annotation document = new Annotation(text);
         StanfordCoreNLP pipeline = language.equals("arabic") ? arabicPipeline : englishPipeline;
 

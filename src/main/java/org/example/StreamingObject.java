@@ -6,19 +6,19 @@ import java.util.Map;
 import java.util.Set;
 
 public class StreamingObject {
-    private List<String> keywords;
+    private Set<String> keywords;
     private double x, y;
     private Map<String, ASPNode> termToNodeMap; // Maps terms to ASP nodes
 
 
-    public StreamingObject(List<String> keywords, double x, double y) {
+    public StreamingObject(Set<String> keywords, double x, double y) {
         this.keywords = keywords;
         this.x = x;
         this.y = y;
         this.termToNodeMap = new HashMap<>();
     }
 
-    public List<String> getAssociatedTerms() {
+    public Set<String> getAssociatedTerms() {
         return keywords;
     }
 

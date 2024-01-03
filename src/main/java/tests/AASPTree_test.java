@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.io.BufferedReader;
+import java.util.Set;
+
 public class AASPTree_test {
     private AASPTree aasptree;
     private static final double DATA_SIZE = 1000;
@@ -35,7 +37,7 @@ public class AASPTree_test {
                     String[] parts = line.split("\t", 3);
                     double x = Double.parseDouble(parts[0]);
                     double y = Double.parseDouble(parts[1]);
-                    List<String> keywords = CoordinateParser.extractKeywords(parts.length > 2 ? parts[2] : "", "english"); // Assume English for simplicity
+                    Set<String> keywords = CoordinateParser.extractKeywords(parts.length > 2 ? parts[2] : "", "english"); // Assume English for simplicity
 
                     // Create a StreamingObject and add it to the AASPTree
                     StreamingObject obj = new StreamingObject(keywords, x, y);
