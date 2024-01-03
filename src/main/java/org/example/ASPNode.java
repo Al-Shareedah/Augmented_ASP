@@ -14,11 +14,15 @@
     private ASPNode SW = null;
     // counter for all nodes in the tree
     private int Count = 0;
+    //Split threshold
     private static final double alpha = 0.5;
     // Total size of all points inserted
     private static int size_n = 0;
+    // Minimum resolution
+    private static final double MIN_RESOLUTION = 1.0;
 
-    private Box bounds;
+
+        private Box bounds;
         public ASPNode(double minX, double minY, double maxX, double maxY) {
             this.bounds = new Box(minX, minY, maxX, maxY);
             this.Count = 0;
@@ -63,6 +67,14 @@
             return null;
         }
         private void refine() {
+            // Check if subdividing this node would result in a box smaller than the minimum resolution
+            double halfWidth = (this.bounds.maxX - this.bounds.minX) / 2;
+            double halfHeight = (this.bounds.maxY - this.bounds.minY) / 2;
+
+            if (halfWidth < MIN_RESOLUTION || halfHeight < MIN_RESOLUTION) {
+                // Do not subdivide further if either dimension of the new box would be below the minimum resolution
+                return;
+            }
             // Split the current node into four children
             this.NW = new ASPNode(this.bounds.minX, this.bounds.centreY, this.bounds.centreX, this.bounds.maxY);
             this.NE = new ASPNode(this.bounds.centreX, this.bounds.centreY, this.bounds.maxX, this.bounds.maxY);
@@ -88,7 +100,14 @@
                 return size;
             }
         }
-
+        public ASPNode getNodeContaining(double x, double y) {
+            // If this node is a leaf or contains the point, return this node
+            if (!this.hasChildren || this.bounds.contains(x, y)) {
+                return this;
+            }
+            // Otherwise, traverse to the correct child node
+            return getChild(x, y).getNodeContaining(x, y);
+        }
         public ASPNode getNW() {
             return NW;
         }

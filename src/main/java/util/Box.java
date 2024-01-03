@@ -94,6 +94,14 @@ public class Box {
         scaleX *= this.centreX - this.minX;
         return new Box(this.minX - scaleX, this.minY-scaleY, this.maxX + scaleX, this.maxY + scaleY);
     }
+    /**
+     * Calculates the area of this box.
+     *
+     * @return The area of the box.
+     */
+    public double area() {
+        return (this.maxX - this.minX) * (this.maxY - this.minY);
+    }
 
     @Override
     public String toString() {
