@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 public class CoordinateParser {
 
     private static StanfordCoreNLP englishPipeline;
-    private static StanfordCoreNLP arabicPipeline;
+
 
     public static void main(String[] args) {
         // Initialize NLP pipelines
@@ -24,14 +24,10 @@ public class CoordinateParser {
     }
     public static void initPipelines() {
         Properties englishProps = new Properties();
-        englishProps.setProperty("annotators", "tokenize,ssplit,pos,lemma");
+        englishProps.setProperty("annotators", "tokenize,ssplit");
         englishPipeline = new StanfordCoreNLP(englishProps);
 
-        Properties arabicProps = new Properties();
-        arabicProps.setProperty("annotators", "tokenize,ssplit,pos,lemma");
-        arabicProps.setProperty("tokenize.language", "ar");
-        arabicProps.setProperty("segment.model", "edu/stanford/nlp/models/segmenter/arabic/arabic-segmenter-atb+bn+arztrain.ser.gz");
-        arabicPipeline = new StanfordCoreNLP(arabicProps);
+
     }
     public static void parseFile(String filePath) {
 
@@ -71,18 +67,14 @@ public class CoordinateParser {
     public static Set<String> extractKeywords(String text, String language) {
         Set<String> keywords = new HashSet<>();
         Annotation document = new Annotation(text);
-        StanfordCoreNLP pipeline = language.equals("arabic") ? arabicPipeline : englishPipeline;
+        StanfordCoreNLP pipeline = englishPipeline;  // Always use English pipeline
 
         pipeline.annotate(document);
         for (CoreMap sentence : document.get(CoreAnnotations.SentencesAnnotation.class)) {
             for (CoreLabel token : sentence.get(CoreAnnotations.TokensAnnotation.class)) {
                 String word = token.word();
-                String pos = token.get(CoreAnnotations.PartOfSpeechAnnotation.class);
-
-                // Use a more lenient check for word characters, suitable for multiple languages
-                if (word.matches("[\\p{L}]+") && isRelevantPOS(pos, language)) {
-                    String lemma = token.get(CoreAnnotations.LemmaAnnotation.class);
-                    keywords.add(lemma);
+                if (word.matches("[\\p{L}_@]+") || word.matches("http[s]?://\\S+")) {
+                    keywords.add(word);
                 }
             }
         }
@@ -93,14 +85,5 @@ public class CoordinateParser {
         Matcher matcher = pattern.matcher(line);
         return matcher.find();
     }
-    private static boolean isRelevantPOS(String posTag, String language) {
-        // Different handling for different languages if needed
-        if (language.equals("english")) {
-            Set<String> irrelevantPOSTags = new HashSet<>(Arrays.asList(",", ".", ":", "CC", "IN", "DT", "PRP", "PRP$"));
-            return !irrelevantPOSTags.contains(posTag);
-        } else {
-            // For non-English languages, you might want to be more lenient or use different criteria
-            return true; // For simplicity, currently allowing all POS tags for non-English languages
-        }
-    }
+
 }

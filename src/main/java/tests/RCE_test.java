@@ -1,8 +1,10 @@
 package tests;
 
+import org.example.CoordinateParser;
 import org.example.RCEstimator;
 import org.junit.Assert;
-import org.junit.jupiter.api.Test;
+import org.junit.Before;
+import org.junit.Test;
 import util.Box;
 
 import java.io.BufferedReader;
@@ -11,64 +13,58 @@ import java.io.IOException;
 import java.util.*;
 import java.util.regex.Pattern;
 
+import static org.junit.Assert.fail;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class RCE_test {
+    private RCEstimator rcEstimator;
+    String queryTerm = "little";
+    int actualTermCount = 0;
+    @Before
+    public void setUp() throws IOException {
+        // Initialize NLP pipelines (Assuming this is a static method in CoordinateParser)
+        CoordinateParser.initPipelines();
+        rcEstimator = new RCEstimator(0.01, new Box(-180, -90, 180, 90));
+    }
+
     @Test
-    public void testSelectivityEstimation() throws IOException {
-        RCEstimator rcEstimator = new RCEstimator(0.01, new Box(-180, -90, 180, 90));
-        HashMap<String, Integer> actualTermCounts = new HashMap<>();
-        Random random = new Random();
-        String line;
-        String queryTerm = "somethin"; // Replace with the actual term to query
-        int totalCount = 0;
+    public void testStreamingObjectsInsertion() {
+        String filePath = "point_keyword_test.txt";
+        int obj_counter = 0;
 
-        Pattern pattern = Pattern.compile("\\s+|,\\s*|\\.\\s*|\\!\\s*|\\?\\s*|\\:\\s*|\\;\\s*|\\@\\s*|\\&\\s*");
-
-
-        try (BufferedReader reader = new BufferedReader(new FileReader("point_keyword_test.txt"))) {
+        // Parse the file and process each line
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+            String line;
             while ((line = reader.readLine()) != null) {
-                String[] parts = line.split("\t");
-                // Check that the line has enough parts
-                if (parts.length < 3) {
-                    // This line doesn't have enough parts to contain both coordinates and text.
-                    continue; // Skip this line and move to the next one.
-                }
-                double x = Double.parseDouble(parts[0]);
-                double y = Double.parseDouble(parts[1]);
+                if (CoordinateParser.isCoordinateLine(line)) {
+                    String[] parts = line.split("\t", 3);
+                    double x = Double.parseDouble(parts[0]);
+                    double y = Double.parseDouble(parts[1]);
+                    Set<String> keywords = CoordinateParser.extractKeywords(parts.length > 2 ? parts[2] : "", "english");
 
-                // Split the sentence into words using the regex pattern.
-                String[] keywords = pattern.split(parts[2]);
-
-                List<String> selectedKeywords = new ArrayList<>();
-
-                // Randomly select keywords for insertion.
-                for (String keyword : keywords) {
-                    String trimmedKeyword = keyword.trim();
-                    if (!trimmedKeyword.isEmpty() && random.nextInt(6) + 1 <= keywords.length) {
-                        selectedKeywords.add(trimmedKeyword);
-                        actualTermCounts.put(trimmedKeyword, actualTermCounts.getOrDefault(trimmedKeyword, 0) + 1);
-                        if (trimmedKeyword.equals(queryTerm)) {
-                            totalCount++;
-                        }
+                    // Process the point and its keywords in the RCEstimator
+                    rcEstimator.processPoint(x, y, keywords);
+                    obj_counter++;
+                    // Increment the actual term count if the query term is present
+                    if (keywords.contains(queryTerm)) {
+                        actualTermCount++;
                     }
                 }
-
-                // Process the point and its selected keywords
-                rcEstimator.processPoint(x, y, new HashSet<>(selectedKeywords));
             }
+        } catch (IOException e) {
+            e.printStackTrace();
+            fail("Failed to read file: " + e.getMessage());
         }
 
         // Perform selectivity estimation for the query term
         double estimatedCount = rcEstimator.estimateSelectivity(new Box(-180, -90, 180, 90), Collections.singleton(queryTerm));
 
         // Log the actual count and the estimated count for comparison
-        System.out.println("Actual count of '" + queryTerm + "': " + totalCount);
+        System.out.println("Actual count of '" + queryTerm + "': " + actualTermCount);
         System.out.println("Estimated count of '" + queryTerm + "': " + estimatedCount);
-
+        System.out.println("Total number of object processed :" + obj_counter);
         // Check if the estimated count is within a reasonable range of the actual count
-        // This range is arbitrary and might need adjustment based on the estimator's accuracy
-        assertTrue(Math.abs(estimatedCount - totalCount) / totalCount < 0.1);
+        assertTrue(Math.abs(estimatedCount - actualTermCount) / actualTermCount < 0.1);
     }
     @Test
     public void testSelectivityEstimate() {
