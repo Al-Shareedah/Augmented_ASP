@@ -62,7 +62,7 @@ public class KMVSynopsisTest {
     @Before
     public void setUp() throws NoSuchAlgorithmException {
         // Initialize AASPTree with the given data size
-        aasptree = new AASPTree(DATA_SIZE, 0.01, new Box(-180, -90, 180, 90));
+        aasptree = new AASPTree(DATA_SIZE, new Box(-180, -90, 180, 90));
 
         // Initialize NLP pipelines (Assuming this is a static method in CoordinateParser)
         CoordinateParser.initPipelines();

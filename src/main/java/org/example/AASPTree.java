@@ -6,10 +6,15 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
+
+import org.jgrapht.*;
+
+import org.jgrapht.graph.*;
+
+
 public class AASPTree {
     private int tau; // KMV: Number of objects to maintain
     private double memoryBudget; // KMV: Memory budget
@@ -17,12 +22,12 @@ public class AASPTree {
     private Map<String, Synopsis> termSynopses; // KMV: Map from terms to their synopses
     private Map<String, Integer> termFrequencies; // RC: Frequencies of terms
     private Map<String, ASPTree> aspTrees; // RC: ASP Trees for terms
-    private double epsilon; // RC: Threshold for ASP Tree creation
+
     private Box space; // RC: Spatial area
     private int totalTermFrequency; // RC: Total term frequency
     private static final double MEMORY_BUDGET_RATIO = 0.05;
 
-    public AASPTree(double data_size, double epsilon, Box space) throws NoSuchAlgorithmException {
+    public AASPTree(double data_size, Box space) throws NoSuchAlgorithmException {
         // KMV Initialization
         this.tau = 0;
         this.memoryBudget = data_size * MEMORY_BUDGET_RATIO;
@@ -30,7 +35,7 @@ public class AASPTree {
         this.termSynopses = new HashMap<>();
 
         // RC Initialization
-        this.epsilon = epsilon;
+
         this.space = space;
         this.termFrequencies = new HashMap<>();
         this.aspTrees = new HashMap<>();
@@ -39,6 +44,7 @@ public class AASPTree {
     public void update(StreamingObject object) {
         // KMV Update
         updateKMVSynopses(object);
+
         processPoint(object.getAssociatedTerms());
 
     }
@@ -163,7 +169,7 @@ public class AASPTree {
         return this.termSynopses;
     }
     // Method to estimate selectivity of a query given a set of keywords and a query box
-    public int getRepSamples(Set<String> keywords, Box queryBox) {
+    public Set<StreamingObject> getRepSamples(Set<String> keywords, Box queryBox) {
         Set<StreamingObject> Lq = new HashSet<>(); // This will hold the union of objects matching query keywords and within the query box
 
         // For each query keyword, retrieve objects from term synopsis and add to Lq if within the query box
@@ -185,15 +191,9 @@ public class AASPTree {
             }
         }
 
-        // Count the number of representative samples in Lq
-        int representativeCount = 0;
-        for (StreamingObject obj : Lq) {
-            if (isRepresentativeSample(obj, keywords, queryBox)) {
-                representativeCount++;
-            }
-        }
 
-        return representativeCount;
+
+        return Lq;
     }
 
     private boolean isRepresentativeSample(StreamingObject obj, Set<String> keywords, Box queryBox) {
@@ -219,7 +219,7 @@ public class AASPTree {
         }
     }
 
-    public double estimateSelectivity(Box queryRange, Set<String> queryTerms) {
+    public double RCSelectivity(Box queryRange, Set<String> queryTerms) {
         double selectivityEstimate = 1.0;
 
         for (String term : queryTerms) {
@@ -235,4 +235,37 @@ public class AASPTree {
 
         return selectivityEstimate;
     }
+
+    // Method to estimate selectivity
+    public double estimateSelectivity(Box queryBox, Set<String> queryKeywords, int K_threshold, BayesianNetwork bayesianNetwork) {
+        // Step 1: Initial Checks
+        if (queryKeywords.size() == 1 || queryKeywords.stream().anyMatch(keyword -> !aspTrees.containsKey(keyword))) {
+            return RCSelectivity(queryBox, queryKeywords);
+        }
+
+        // Step 2: Retrieve representative samples, TODO: change so that it would return the set of objects within query R
+        Set<StreamingObject> Lq = getRepSamples(queryKeywords, queryBox);
+        int K = Lq.size();
+
+        // Step 3: Local boosting and Chow-Liu tree construction
+        if (K < K_threshold) {
+            // Call local boosting method (not implemented in provided code)
+            // TODO: call local boosting method
+            Graph<Integer, DefaultEdge> chowLiuTree = BayesianNetwork.buildChowLiuTree(new HashSet<>(queryKeywords), Lq, queryKeywords.size());
+        }else {
+
+            Graph<Integer, DefaultEdge> chowLiuTree = BayesianNetwork.buildChowLiuTree(new HashSet<>(queryKeywords), Lq, queryKeywords.size());
+        }
+
+        // Step 4: Calculate selectivity
+        double theta = 1.0;
+        int N = K;
+
+
+
+        // Final selectivity estimation
+        return N * theta;
+    }
+
+
 }
