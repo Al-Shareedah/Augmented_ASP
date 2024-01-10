@@ -20,11 +20,12 @@ public class AASPTree {
     private double epsilon; // RC: Threshold for ASP Tree creation
     private Box space; // RC: Spatial area
     private int totalTermFrequency; // RC: Total term frequency
+    private static final double MEMORY_BUDGET_RATIO = 0.05;
 
     public AASPTree(double data_size, double epsilon, Box space) throws NoSuchAlgorithmException {
         // KMV Initialization
         this.tau = 0;
-        this.memoryBudget = data_size * 0.05;
+        this.memoryBudget = data_size * MEMORY_BUDGET_RATIO;
         this.synopsisSet = new PriorityQueue<>((o1, o2) -> Double.compare(hashStreamingObject(o1), hashStreamingObject(o2)));
         this.termSynopses = new HashMap<>();
 
@@ -54,12 +55,16 @@ public class AASPTree {
             for (String term : associatedTerms) {
                 Synopsis termSynopsis = termSynopses.computeIfAbsent(term, k -> new Synopsis());
                 termSynopsis.addObject(newObj);
-                // Check if the term should have an ASPTree
-                if (shouldMaintainASPTree(term)) {
-                    aspTrees.computeIfAbsent(term, k -> new ASPTree(space.minX, space.minY, space.maxX, space.maxY));
-                    if (aspTrees.containsKey(term)) {
-                        aspTrees.get(term).put(newObj.getX(), newObj.getY());
-                    }
+
+                // Ensure the ASPTree exists for the term
+                ASPTree aspTree = aspTrees.computeIfAbsent(term, k -> new ASPTree(space.minX, space.minY, space.maxX, space.maxY));
+
+                // Insert the point and get the corresponding ASPNode
+                ASPNode aspNode = aspTree.putAndGetNode(newObj.getX(), newObj.getY());
+
+                // Add the ASPNode reference to the StreamingObject
+                if (aspNode != null) {
+                    newObj.addAspTreeNode(aspNode);
                 }
 
             }
