@@ -73,9 +73,8 @@ public class CoordinateParser {
         for (CoreMap sentence : document.get(CoreAnnotations.SentencesAnnotation.class)) {
             for (CoreLabel token : sentence.get(CoreAnnotations.TokensAnnotation.class)) {
                 String word = token.word();
-                if (word.matches("[\\p{L}_@]+") || word.matches("http[s]?://\\S+")) {
-                    keywords.add(word);
-                }
+                // Add every word without filtering
+                keywords.add(word);
             }
         }
         return keywords;

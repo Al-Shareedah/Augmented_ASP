@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
-
+import org.example.BayesianNetwork;
 import org.jgrapht.*;
 
 import org.jgrapht.graph.*;
@@ -25,7 +25,7 @@ public class AASPTree {
 
     private Box space; // RC: Spatial area
     private int totalTermFrequency; // RC: Total term frequency
-    private static final double MEMORY_BUDGET_RATIO = 0.05;
+    private static final double MEMORY_BUDGET_RATIO = 0.1;
 
     public AASPTree(double data_size, Box space) throws NoSuchAlgorithmException {
         // KMV Initialization
@@ -45,7 +45,7 @@ public class AASPTree {
         // KMV Update
         updateKMVSynopses(object);
 
-        processPoint(object.getAssociatedTerms());
+        //frequencyCounter(object.getAssociatedTerms());
 
     }
     public void updateKMVSynopses(StreamingObject newObj) {
@@ -83,8 +83,7 @@ public class AASPTree {
             // Remove the object from the synopsis for each associated term
             for (String term : objectToRemove.getAssociatedTerms()) {
                 if (!termSynopses.containsKey(term)) {
-                    // This is a problem: the term should exist
-                    System.out.println("Term not found in termSynopses: " + term);
+
                     continue; // Skip this term to avoid NullPointerException
                 }
                 Synopsis termSynopsis = termSynopses.get(term);
@@ -169,49 +168,43 @@ public class AASPTree {
         return this.termSynopses;
     }
     // Method to estimate selectivity of a query given a set of keywords and a query box
-    public Set<StreamingObject> getRepSamples(Set<String> keywords, Box queryBox) {
-        Set<StreamingObject> Lq = new HashSet<>(); // This will hold the union of objects matching query keywords and within the query box
+    public Set<StreamingObject> getObjSamples(Box queryBox) {
+        Set<StreamingObject> Lq = new HashSet<>(); // This will hold the objects within the query box
 
-        // For each query keyword, retrieve objects from term synopsis and add to Lq if within the query box
-        for (String keyword : keywords) {
-            Synopsis termSynopsis = termSynopses.get(keyword);
+        // Iterate over all term synopses
+        for (Map.Entry<String, Synopsis> entry : termSynopses.entrySet()) {
+            Synopsis termSynopsis = entry.getValue();
             if (termSynopsis != null) {
                 for (StreamingObject obj : termSynopsis.getGridIndex().values().stream().flatMap(Set::stream).collect(Collectors.toSet())) {
                     // Check if object is within query box
                     if (queryBox.contains(obj.getX(), obj.getY())) {
-                        // Check if object contains any of the keywords in the set
-                        for (String key : obj.getAssociatedTerms()) {
-                            if (keywords.contains(key)) {
-                                Lq.add(obj);
-                                break; // No need to check further keywords
-                            }
-                        }
+                        Lq.add(obj);
                     }
                 }
             }
         }
 
-
-
         return Lq;
     }
 
-    private boolean isRepresentativeSample(StreamingObject obj, Set<String> keywords, Box queryBox) {
-        // Check if the object is within the query box
-        if (!queryBox.contains(obj.getX(), obj.getY())) {
-            return false;
-        }
 
-        // Check if the object has at least one keyword from the keywords set
-        for (String keyword : keywords) {
-            if (obj.getAssociatedTerms().contains(keyword)) {
-                return true;
+    private int countRepresentativeSamples(Set<StreamingObject> Lq, Set<String> keywords) {
+        int representativeSampleCount = 0;
+
+        for (StreamingObject obj : Lq) {
+            // Check if the object has at least one keyword from the keywords set
+            for (String keyword : keywords) {
+                if (obj.getAssociatedTerms().contains(keyword)) {
+                    representativeSampleCount++;
+                    break; // No need to check further keywords for this object
+                }
             }
         }
 
-        return false;
+        return representativeSampleCount;
     }
-    public void processPoint( Set<String> terms) {
+
+    public void frequencyCounter(Set<String> terms) {
         for (String term : terms) {
             termFrequencies.put(term, termFrequencies.getOrDefault(term, 0) + 1);
             totalTermFrequency++;
@@ -237,34 +230,40 @@ public class AASPTree {
     }
 
     // Method to estimate selectivity
-    public double estimateSelectivity(Box queryBox, Set<String> queryKeywords, int K_threshold, BayesianNetwork bayesianNetwork) {
+    public void estimateSelectivity(Box queryBox, Set<String> queryKeywords) {
         // Step 1: Initial Checks
         if (queryKeywords.size() == 1 || queryKeywords.stream().anyMatch(keyword -> !aspTrees.containsKey(keyword))) {
-            return RCSelectivity(queryBox, queryKeywords);
+            // return RCSelectivity(queryBox, queryKeywords);
         }
 
         // Step 2: Retrieve representative samples, TODO: change so that it would return the set of objects within query R
-        Set<StreamingObject> Lq = getRepSamples(queryKeywords, queryBox);
-        int K = Lq.size();
+        Set<StreamingObject> Lq = getObjSamples(queryBox);
+        int K = countRepresentativeSamples(Lq,queryKeywords );
 
-        // Step 3: Local boosting and Chow-Liu tree construction
-        if (K < K_threshold) {
-            // Call local boosting method (not implemented in provided code)
-            // TODO: call local boosting method
-            Graph<Integer, DefaultEdge> chowLiuTree = BayesianNetwork.buildChowLiuTree(new HashSet<>(queryKeywords), Lq, queryKeywords.size());
-        }else {
+        Graph<Integer, DefaultEdge> chowLiuTree = BayesianNetwork.buildChowLiuTree(new HashSet<>(queryKeywords), Lq, queryKeywords.size());
+        // Print the edges and weights of the tree
+        for (DefaultEdge edge : chowLiuTree.edgeSet()) {
+            int source = chowLiuTree.getEdgeSource(edge);
+            int target = chowLiuTree.getEdgeTarget(edge);
+            double weight = chowLiuTree.getEdgeWeight(edge);
 
-            Graph<Integer, DefaultEdge> chowLiuTree = BayesianNetwork.buildChowLiuTree(new HashSet<>(queryKeywords), Lq, queryKeywords.size());
+            System.out.println("Edge: " + source + " - " + target + ", Weight: " + weight);
+        }
+        // Identify the root node
+        int rootNode = BayesianNetwork.findRootNode(chowLiuTree);
+
+        // Perform depth-first search from root node
+        Map<Integer, Integer> parentChildMap = new HashMap<>();
+        BayesianNetwork.depthFirstSearch(chowLiuTree, rootNode, -1, parentChildMap);
+
+        // Print parent-child relationships
+        for (Map.Entry<Integer, Integer> entry : parentChildMap.entrySet()) {
+            if (entry.getValue() != -1) { // Ignore the root node
+                System.out.println("Parent: " + entry.getValue() + ", Child: " + entry.getKey());
+            }
         }
 
-        // Step 4: Calculate selectivity
-        double theta = 1.0;
-        int N = K;
 
-
-
-        // Final selectivity estimation
-        return N * theta;
     }
 
 

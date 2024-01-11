@@ -11,6 +11,8 @@ import util.Box;
 import java.io.FileReader;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.io.BufferedReader;
 import java.util.Set;
@@ -23,6 +25,7 @@ public class AASPTree_test {
     public void setUp() throws NoSuchAlgorithmException {
         // Initialize AASPTree with the given data size
         aasptree = new AASPTree(DATA_SIZE, new Box(-180, -90, 180, 90));
+        // Define the query box and keywords
 
         // Initialize NLP pipelines (Assuming this is a static method in CoordinateParser)
         CoordinateParser.initPipelines();
@@ -47,23 +50,25 @@ public class AASPTree_test {
                     obj_counter++;
                 }
             }
+            System.out.printf("Done");
         } catch (IOException e) {
             e.printStackTrace();
             fail("Failed to read file: " + e.getMessage());
         }
-/*
+
         // Assert that the KMVSynopsis within AASPTree has processed the objects
-        int objectCount = aasptree.kmvSynopsis.getSynopsisSize();
-        // Get the normalized hash values
-        List<Double> values = aasptree.kmvSynopsis.getNormalizedHashValues();
-        // Print all the normalized hash values
-        for (double value : values) {
-            System.out.println(value +", ");
-        }
+        int objectCount = aasptree.getSynopsisSize();
+
+
+        Box queryBox = new Box(-97.31554113, -31.399994, 115.22774061, 56.05831074);
+        Set<String> queryKeywords = new HashSet<>(Arrays.asList("the", "I", "love"));
+        aasptree.estimateSelectivity(queryBox, queryKeywords);
+
+
         System.out.println("The object count in the AASP is: " + objectCount+ "The object passed are: " + obj_counter);
         assertTrue("AASPTree should have processed objects", objectCount > 0);
 
- */
+
     }
 }
 
