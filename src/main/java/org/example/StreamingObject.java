@@ -8,7 +8,7 @@ import java.util.Set;
 public class StreamingObject {
     private Set<String> keywords;
     private double x, y;
-    private Map<StreamingObject, ASPNode> aspTreeNodes; // Map from ASP-tree to the corresponding node
+    private Map<String, ASPNode> termAspTreeNodes; // Map from term to its ASP-node
 
     private long zOrder; // Z-order value for the object
 
@@ -17,7 +17,7 @@ public class StreamingObject {
         this.keywords = keywords;
         this.x = x;
         this.y = y;
-        this.aspTreeNodes = new HashMap<>();
+        this.termAspTreeNodes = new HashMap<>();
         this.zOrder = Synopsis.computeZOrder(x, y);
     }
 
@@ -34,15 +34,16 @@ public class StreamingObject {
         return y;
     }
 
-    // Method to add an ASPNode reference
-    public void addAspTreeNode(ASPNode node) {
-        this.aspTreeNodes.put(this, node); // 'this' refers to the current StreamingObject instance
+
+    // Method to add an ASPNode reference for a term
+    public void addAspTreeNode(String term, ASPNode node) {
+        this.termAspTreeNodes.put(term, node);
+    }
+    // Getter for termAspTreeNodes
+    public Map<String, ASPNode> getTermAspTreeNodes() {
+        return termAspTreeNodes;
     }
 
-    // Method to get the ASPNode references
-    public Map<StreamingObject, ASPNode> getAspTreeNodes() {
-        return aspTreeNodes;
-    }
     // Getter for Z-order
     public long getZOrder() {
         return zOrder;

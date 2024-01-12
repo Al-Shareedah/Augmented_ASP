@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
-import org.example.BayesianNetwork;
+
 import org.jgrapht.*;
 
 import org.jgrapht.graph.*;
@@ -20,10 +20,10 @@ public class AASPTree {
     private double memoryBudget; // KMV: Memory budget
     private PriorityQueue<StreamingObject> synopsisSet; // KMV: The overall KMV synopsis set
     private Map<String, Synopsis> termSynopses; // KMV: Map from terms to their synopses
-    private Map<String, Integer> termFrequencies; // RC: Frequencies of terms
-    private Map<String, ASPTree> aspTrees; // RC: ASP Trees for terms
+    private static Map<String, Integer> termFrequencies; // RC: Frequencies of terms
+    private static Map<String, ASPTree> aspTrees; // RC: ASP Trees for terms
 
-    private Box space; // RC: Spatial area
+    private static Box space; // RC: Spatial area
     private int totalTermFrequency; // RC: Total term frequency
     private static final double MEMORY_BUDGET_RATIO = 0.1;
 
@@ -45,36 +45,40 @@ public class AASPTree {
         // KMV Update
         updateKMVSynopses(object);
 
-        //frequencyCounter(object.getAssociatedTerms());
 
     }
     public void updateKMVSynopses(StreamingObject newObj) {
         double v = hashStreamingObject(newObj);
 
-        // Check if the object's hash is less than the current threshold
+        boolean addedToSynopsis = false;
+
         if (v < getCurrentThreshold()) {
             synopsisSet.add(newObj);
             tau++;
+            addedToSynopsis = true;
 
-            // Update term synopses
-            Set<String> associatedTerms = newObj.getAssociatedTerms();
-            for (String term : associatedTerms) {
+            // Update term synopses and ASP trees
+            for (String term : newObj.getAssociatedTerms()) {
+                // Update term synopses
                 Synopsis termSynopsis = termSynopses.computeIfAbsent(term, k -> new Synopsis());
                 termSynopsis.addObject(newObj);
 
-                // Ensure the ASPTree exists for the term
+                // Update or create ASP tree for the term
                 ASPTree aspTree = aspTrees.computeIfAbsent(term, k -> new ASPTree(space.minX, space.minY, space.maxX, space.maxY));
-
-                // Insert the point and get the corresponding ASPNode
                 ASPNode aspNode = aspTree.putAndGetNode(newObj.getX(), newObj.getY());
 
                 // Add the ASPNode reference to the StreamingObject
                 if (aspNode != null) {
-                    newObj.addAspTreeNode(aspNode);
+                    newObj.addAspTreeNode(term, aspNode);
                 }
-
             }
         }
+
+        // Call frequencyCounter if object is not added to synopsisSet
+        if (!addedToSynopsis) {
+            frequencyCounter(newObj.getAssociatedTerms());
+        }
+
         // Adjust the synopses if the memory budget is exceeded
         while (synopsisSet.size() > memoryBudget) {
             StreamingObject objectToRemove = synopsisSet.poll(); // Get the object with the τ-th smallest hash value
@@ -212,12 +216,12 @@ public class AASPTree {
         }
     }
 
-    public double RCSelectivity(Box queryRange, Set<String> queryTerms) {
+    public static double RCEstimate(Box queryRange, Set<String> queryTerms) {
         double selectivityEstimate = 1.0;
 
         for (String term : queryTerms) {
             double termEstimate;
-            if (aspTrees.containsKey(term)) {
+            if (aspTrees.containsKey(term) ) {
                 termEstimate = aspTrees.get(term).estimatePointsWithin(queryRange);
             } else {
                 double rho = queryRange.area() / space.area();
@@ -236,7 +240,7 @@ public class AASPTree {
             // return RCSelectivity(queryBox, queryKeywords);
         }
 
-        // Step 2: Retrieve representative samples, TODO: change so that it would return the set of objects within query R
+        // Step 2: Retrieve representative samples
         Set<StreamingObject> Lq = getObjSamples(queryBox);
         int K = countRepresentativeSamples(Lq,queryKeywords );
 
@@ -256,15 +260,32 @@ public class AASPTree {
         Map<Integer, Integer> parentChildMap = new HashMap<>();
         BayesianNetwork.depthFirstSearch(chowLiuTree, rootNode, -1, parentChildMap);
 
-        // Print parent-child relationships
-        for (Map.Entry<Integer, Integer> entry : parentChildMap.entrySet()) {
-            if (entry.getValue() != -1) { // Ignore the root node
-                System.out.println("Parent: " + entry.getValue() + ", Child: " + entry.getKey());
-            }
+        // Calculate marginal probability for the root node
+        Map<String, Double> marginalProbabilities = new HashMap<>();
+        String rootKeyword = new ArrayList<>(queryKeywords).get(rootNode);
+        marginalProbabilities.put(rootKeyword, BayesianNetwork.calculateMarginalProbabilityForNode(rootKeyword, queryBox, Lq));
+
+        // Calculate conditional probabilities for non-root nodes
+        Map<String, Double> conditionalProbabilities = BayesianNetwork.calculateConditionalProbabilities(queryKeywords, Lq, parentChildMap, chowLiuTree);
+
+        System.out.println("Marginal Probability for Root Node:");
+        for (Map.Entry<String, Double> entry : marginalProbabilities.entrySet()) {
+            System.out.println("Keyword ("+ entry.getKey() + ") : " + entry.getValue());
+        }
+
+        System.out.println("Conditional Probabilities for Non-Root Nodes:");
+        for (Map.Entry<String, Double> entry : conditionalProbabilities.entrySet()) {
+            System.out.println(entry.getKey() + ": " + entry.getValue());
         }
 
 
     }
 
+    public Map<String, ASPTree> getAspTrees() {
+        return aspTrees;
+    }
 
+    public Box getSpace() {
+        return space;
+    }
 }

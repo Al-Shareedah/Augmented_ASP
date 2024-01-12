@@ -5,6 +5,8 @@ import org.jgrapht.alg.interfaces.SpanningTreeAlgorithm;
 import org.jgrapht.alg.util.UnionFind;
 import org.jgrapht.graph.*;
 import org.jgrapht.alg.spanning.*;
+import util.Box;
+
 public class BayesianNetwork {
     public static void main(String[] args) {
         Set<StreamingObject> objects = new HashSet<>();
@@ -58,11 +60,22 @@ public class BayesianNetwork {
         Map<Integer, Integer> parentChildMap = new HashMap<>();
         depthFirstSearch(chowLiuTree, rootNode, -1, parentChildMap);
 
-        // Print parent-child relationships
-        for (Map.Entry<Integer, Integer> entry : parentChildMap.entrySet()) {
-            if (entry.getValue() != -1) { // Ignore the root node
-                System.out.println("Parent: " + entry.getValue() + ", Child: " + entry.getKey());
-            }
+        // Calculate marginal probability for the root node
+        Map<String, Double> marginalProbabilities = new HashMap<>();
+        String rootKeyword = new ArrayList<>(queryKeywords).get(rootNode);
+    //    marginalProbabilities.put(rootKeyword, calculateMarginalProbabilityForNode(rootKeyword, objects));
+
+        // Calculate conditional probabilities for non-root nodes
+        Map<String, Double> conditionalProbabilities = calculateConditionalProbabilities(queryKeywords, objects, parentChildMap, chowLiuTree);
+
+        System.out.println("Marginal Probability for Root Node:");
+        for (Map.Entry<String, Double> entry : marginalProbabilities.entrySet()) {
+            System.out.println("Keyword ("+ entry.getKey() + ") : " + entry.getValue());
+        }
+
+        System.out.println("Conditional Probabilities for Non-Root Nodes:");
+        for (Map.Entry<String, Double> entry : conditionalProbabilities.entrySet()) {
+            System.out.println(entry.getKey() + ": " + entry.getValue());
         }
 
     }
@@ -218,4 +231,59 @@ public class BayesianNetwork {
             }
         }
     }
+
+    public static double calculateMarginalProbabilityForNode(String keyword, Box queryRange,  Set<StreamingObject> objects) {
+        // Use the RCSelectivity method to estimate the count of the keyword
+
+        Set<String> queryTerms = new HashSet<>(Collections.singletonList(keyword));
+        double estimatedCount = AASPTree.RCEstimate(queryRange, queryTerms);
+
+        // Manual count of the keyword within the query range
+        int manualCount = 0;
+        for (StreamingObject obj : objects) {
+            if (queryRange.contains(obj.getX(), obj.getY()) && obj.getAssociatedTerms().contains(keyword)) {
+                manualCount++;
+            }
+        }
+        // Print the manual count
+        System.out.println("Manual count of keyword '" + keyword + "' within the query range: " + manualCount);
+        System.out.println("Estimated count using RCEstimate '" + keyword + "' within the query range " + estimatedCount);
+        // Calculate the marginal probability
+        return estimatedCount / objects.size();
+    }
+    public static Map<String, Double> calculateConditionalProbabilities(Set<String> queryKeywords, Set<StreamingObject> objects, Map<Integer, Integer> parentChildMap, Graph<Integer, DefaultEdge> tree) {
+        Map<String, Double> probabilities = new HashMap<>();
+        List<String> keywordList = new ArrayList<>(queryKeywords);
+
+        for (Map.Entry<Integer, Integer> entry : parentChildMap.entrySet()) {
+            int child = entry.getKey();
+            int parent = entry.getValue();
+
+            // Skip root node
+            if (parent == -1) continue;
+
+            double parentChildCount = 0;
+            double parentCount = 0;
+
+            String childKeyword = keywordList.get(child);
+            String parentKeyword = keywordList.get(parent);
+
+            for (StreamingObject obj : objects) {
+                boolean parentPresent = obj.getAssociatedTerms().contains(parentKeyword);
+                boolean childPresent = obj.getAssociatedTerms().contains(childKeyword);
+
+                if (parentPresent) {
+                    parentCount++;
+                    if (childPresent) {
+                        parentChildCount++;
+                    }
+                }
+            }
+
+            double conditionalProbability = parentCount == 0 ? 0 : parentChildCount / parentCount;
+            probabilities.put("P( Keyword (" + childKeyword + ") | Keyword (" + parentKeyword + ") )", conditionalProbability);
+        }
+        return probabilities;
+    }
+
 }
