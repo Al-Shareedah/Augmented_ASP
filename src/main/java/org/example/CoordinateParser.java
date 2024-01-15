@@ -12,23 +12,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 public class CoordinateParser {
 
-    private static StanfordCoreNLP englishPipeline;
+
 
 
     public static void main(String[] args) {
-        // Initialize NLP pipelines
-        initPipelines();
 
         String filePath = "point_keyword_test.txt";
         parseFile(filePath);
     }
-    public static void initPipelines() {
-        Properties englishProps = new Properties();
-        englishProps.setProperty("annotators", "tokenize,ssplit");
-        englishPipeline = new StanfordCoreNLP(englishProps);
 
-
-    }
     public static void parseFile(String filePath) {
 
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
@@ -39,7 +31,7 @@ public class CoordinateParser {
             while ((line = reader.readLine()) != null) {
                 if (isCoordinateLine(line)) {
                     if (textBuilder.length() > 0) {
-                        Set<String> keywords = extractKeywords(textBuilder.toString(), "english"); // Change language as needed
+                        Set<String> keywords = extractKeywords(textBuilder.toString()); // Change language as needed
                         System.out.println("Coordinates: (" + x + ", " + y + "), Keywords: " + keywords);
                         textBuilder.setLength(0);
                     }
@@ -54,7 +46,7 @@ public class CoordinateParser {
             }
 
             if (textBuilder.length() > 0) {
-                Set<String> keywords = extractKeywords(textBuilder.toString(), "english"); // Change language as needed
+                Set<String> keywords = extractKeywords(textBuilder.toString()); // Change language as needed
                 System.out.println("Coordinates: (" + x + ", " + y + "), Keywords: " + keywords);
 
             }
@@ -64,19 +56,13 @@ public class CoordinateParser {
             e.printStackTrace();
         }
     }
-    public static Set<String> extractKeywords(String text, String language) {
+    public static Set<String> extractKeywords(String text) {
         Set<String> keywords = new HashSet<>();
-        Annotation document = new Annotation(text);
-        StanfordCoreNLP pipeline = englishPipeline;  // Always use English pipeline
 
-        pipeline.annotate(document);
-        for (CoreMap sentence : document.get(CoreAnnotations.SentencesAnnotation.class)) {
-            for (CoreLabel token : sentence.get(CoreAnnotations.TokensAnnotation.class)) {
-                String word = token.word();
-                // Add every word without filtering
-                keywords.add(word);
-            }
-        }
+        // Split the text into words based on spaces and common punctuation
+        String[] words = text.split("[\\s,.!?;:]+");
+        Collections.addAll(keywords, words);
+
         return keywords;
     }
     public static boolean isCoordinateLine(String line) {

@@ -22,8 +22,6 @@ public class RCE_test {
     int actualTermCount = 0;
     @Before
     public void setUp() throws IOException {
-        // Initialize NLP pipelines (Assuming this is a static method in CoordinateParser)
-        CoordinateParser.initPipelines();
         rcEstimator = new RCEstimator(0.01, new Box(-180, -90, 180, 90));
     }
 
@@ -40,7 +38,7 @@ public class RCE_test {
                     String[] parts = line.split("\t", 3);
                     double x = Double.parseDouble(parts[0]);
                     double y = Double.parseDouble(parts[1]);
-                    Set<String> keywords = CoordinateParser.extractKeywords(parts.length > 2 ? parts[2] : "", "english");
+                    Set<String> keywords = CoordinateParser.extractKeywords(parts.length > 2 ? parts[2] : "");
 
                     // Process the point and its keywords in the RCEstimator
                     rcEstimator.processPoint(x, y, keywords);

@@ -64,8 +64,6 @@ public class KMVSynopsisTest {
         // Initialize AASPTree with the given data size
         aasptree = new AASPTree(DATA_SIZE, new Box(-180, -90, 180, 90));
 
-        // Initialize NLP pipelines (Assuming this is a static method in CoordinateParser)
-        CoordinateParser.initPipelines();
     }
     @Test
     public void testEstimateSelectivity() {
@@ -81,7 +79,7 @@ public class KMVSynopsisTest {
                     String[] parts = line.split("\t", 3);
                     double x = Double.parseDouble(parts[0]);
                     double y = Double.parseDouble(parts[1]);
-                    Set<String> keywords = CoordinateParser.extractKeywords(parts.length > 2 ? parts[2] : "", "english");
+                    Set<String> keywords = CoordinateParser.extractKeywords(parts.length > 2 ? parts[2] : "");
 
                     // Create a StreamingObject and add it to the KMVSynopsis
                     StreamingObject obj = new StreamingObject(keywords, x, y);
