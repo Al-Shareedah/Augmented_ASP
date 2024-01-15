@@ -27,7 +27,7 @@ public class AASPTree {
     private int totalTermFrequency; // RC: Total term frequency
     private static final double MEMORY_BUDGET_RATIO = 0.1;
 
-    public AASPTree(double data_size, Box space) throws NoSuchAlgorithmException {
+    public AASPTree(double data_size, Box space) {
         // KMV Initialization
         this.tau = 0;
         this.memoryBudget = data_size * MEMORY_BUDGET_RATIO;
@@ -63,14 +63,16 @@ public class AASPTree {
                 Synopsis termSynopsis = termSynopses.computeIfAbsent(term, k -> new Synopsis());
                 termSynopsis.addObject(newObj);
 
-                // Update or create ASP tree for the term
-                ASPTree aspTree = aspTrees.computeIfAbsent(term, k -> new ASPTree(space.minX, space.minY, space.maxX, space.maxY));
-                ASPNode aspNode = aspTree.putAndGetNode(newObj.getX(), newObj.getY());
-
-                // Add the ASPNode reference to the StreamingObject
-                if (aspNode != null) {
-                    newObj.addAspTreeNode(term, aspNode);
+                // Check if an ASP tree exists for the term
+                ASPTree aspTree = aspTrees.get(term);
+                if (aspTree == null) {
+                    // Create a new ASP tree if it doesn't exist
+                    aspTree = new ASPTree(space.minX, space.minY, space.maxX, space.maxY);
+                    aspTrees.put(term, aspTree);
                 }
+
+                // Add the new object's node to the ASP tree
+                aspTree.putAndGetNode(newObj.getX(), newObj.getY());
             }
         }
 
@@ -145,7 +147,7 @@ public class AASPTree {
 
 
     // Method to query objects by keyword using the grid-based inverted index
-    public Set<StreamingObject> queryByKeyword(String keyword) {
+    public Set<StreamingObject> DVEstimator(String keyword) {
         Set<StreamingObject> result = new HashSet<>();
         Synopsis termSynopsis = termSynopses.get(keyword);
         if (termSynopsis != null) {
@@ -168,9 +170,7 @@ public class AASPTree {
         }
         return result;
     }
-    public Map<String, Synopsis> getTermSynopses() {
-        return this.termSynopses;
-    }
+
     // Method to estimate selectivity of a query given a set of keywords and a query box
     public Set<StreamingObject> getObjSamples(Box queryBox) {
         Set<StreamingObject> Lq = new HashSet<>(); // This will hold the objects within the query box
@@ -192,7 +192,7 @@ public class AASPTree {
     }
 
 
-    private int countRepresentativeSamples(Set<StreamingObject> Lq, Set<String> keywords) {
+    public int countRepresentativeSamples(Set<StreamingObject> Lq, Set<String> keywords) {
         int representativeSampleCount = 0;
 
         for (StreamingObject obj : Lq) {
@@ -234,39 +234,78 @@ public class AASPTree {
     }
 
     // Method to estimate selectivity
-    public void estimateSelectivity(Box queryBox, Set<String> queryKeywords) {
+    public double estimateSelectivity(Box queryBox, Set<String> queryKeywords, int K_threshold) {
         // Step 1: Initial Checks
         if (queryKeywords.size() == 1 || queryKeywords.stream().anyMatch(keyword -> !aspTrees.containsKey(keyword))) {
-            // return RCSelectivity(queryBox, queryKeywords);
+             return RCEstimate(queryBox, queryKeywords);
         }
+        // Initialize marginal and conditional probabilities maps
+        Map<String, Double> marginalProbabilities = new HashMap<>();
+        Map<String, Double> conditionalProbabilities = new HashMap<>();
+        String rootKeyword;
 
         // Step 2: Retrieve representative samples
         Set<StreamingObject> Lq = getObjSamples(queryBox);
-        int K = countRepresentativeSamples(Lq,queryKeywords );
+        int K = countRepresentativeSamples(Lq,queryKeywords);
 
-        Graph<Integer, DefaultEdge> chowLiuTree = BayesianNetwork.buildChowLiuTree(new HashSet<>(queryKeywords), Lq, queryKeywords.size());
-        // Print the edges and weights of the tree
-        for (DefaultEdge edge : chowLiuTree.edgeSet()) {
-            int source = chowLiuTree.getEdgeSource(edge);
-            int target = chowLiuTree.getEdgeTarget(edge);
-            double weight = chowLiuTree.getEdgeWeight(edge);
+        // Check if K is less than K threshold
+        if ( K < K_threshold){
+            // Call localBoosting to potentially find a better query box
+            Box boostedQueryBox = localBoosting(queryKeywords, queryBox, K);
+            Set<StreamingObject> new_Lq = getObjSamples(boostedQueryBox);
+            // Learn graph structure based on the new query region
+            Graph<Integer, DefaultEdge> chowLiuTree = BayesianNetwork.buildChowLiuTree(new HashSet<>(queryKeywords), new_Lq, queryKeywords.size());
+            // Print the edges and weights of the tree
+            for (DefaultEdge edge : chowLiuTree.edgeSet()) {
+                int source = chowLiuTree.getEdgeSource(edge);
+                int target = chowLiuTree.getEdgeTarget(edge);
+                double weight = chowLiuTree.getEdgeWeight(edge);
 
-            System.out.println("Edge: " + source + " - " + target + ", Weight: " + weight);
+                System.out.println("Edge: " + source + " - " + target + ", Weight: " + weight);
+            }
+            // Identify the root node
+            int rootNode = BayesianNetwork.findRootNode(chowLiuTree);
+
+            // Perform depth-first search from root node
+            Map<Integer, Integer> parentChildMap = new HashMap<>();
+            BayesianNetwork.depthFirstSearch(chowLiuTree, rootNode, -1, parentChildMap);
+
+            // Calculate marginal probability for the root node
+            rootKeyword = new ArrayList<>(queryKeywords).get(rootNode);
+            // calculate marginal probability for parent nodes on the original query region
+            marginalProbabilities.put(rootKeyword, BayesianNetwork.calculateMarginalProbabilityForNode(rootKeyword, queryBox, Lq));
+
+            // Calculate conditional probabilities for non-root nodes on the boosted region
+            conditionalProbabilities = BayesianNetwork.calculateConditionalProbabilities(queryKeywords, new_Lq, parentChildMap, chowLiuTree);
+
         }
-        // Identify the root node
-        int rootNode = BayesianNetwork.findRootNode(chowLiuTree);
+        else{
+            // Learn graph structure based on the new query region
+            Graph<Integer, DefaultEdge> chowLiuTree = BayesianNetwork.buildChowLiuTree(new HashSet<>(queryKeywords), Lq, queryKeywords.size());
+            // Print the edges and weights of the tree
+            for (DefaultEdge edge : chowLiuTree.edgeSet()) {
+                int source = chowLiuTree.getEdgeSource(edge);
+                int target = chowLiuTree.getEdgeTarget(edge);
+                double weight = chowLiuTree.getEdgeWeight(edge);
 
-        // Perform depth-first search from root node
-        Map<Integer, Integer> parentChildMap = new HashMap<>();
-        BayesianNetwork.depthFirstSearch(chowLiuTree, rootNode, -1, parentChildMap);
+                System.out.println("Edge: " + source + " - " + target + ", Weight: " + weight);
+            }
+            // Identify the root node
+            int rootNode = BayesianNetwork.findRootNode(chowLiuTree);
 
-        // Calculate marginal probability for the root node
-        Map<String, Double> marginalProbabilities = new HashMap<>();
-        String rootKeyword = new ArrayList<>(queryKeywords).get(rootNode);
-        marginalProbabilities.put(rootKeyword, BayesianNetwork.calculateMarginalProbabilityForNode(rootKeyword, queryBox, Lq));
+            // Perform depth-first search from root node
+            Map<Integer, Integer> parentChildMap = new HashMap<>();
+            BayesianNetwork.depthFirstSearch(chowLiuTree, rootNode, -1, parentChildMap);
 
-        // Calculate conditional probabilities for non-root nodes
-        Map<String, Double> conditionalProbabilities = BayesianNetwork.calculateConditionalProbabilities(queryKeywords, Lq, parentChildMap, chowLiuTree);
+            // Calculate marginal probability for the root node
+            rootKeyword = new ArrayList<>(queryKeywords).get(rootNode);
+            // calculate marginal probability for parent nodes on the original query region
+            marginalProbabilities.put(rootKeyword, BayesianNetwork.calculateMarginalProbabilityForNode(rootKeyword, queryBox, Lq));
+
+            // Calculate conditional probabilities for non-root nodes on the boosted region
+            conditionalProbabilities = BayesianNetwork.calculateConditionalProbabilities(queryKeywords, Lq, parentChildMap, chowLiuTree);
+
+        }
 
         System.out.println("Marginal Probability for Root Node:");
         for (Map.Entry<String, Double> entry : marginalProbabilities.entrySet()) {
@@ -277,15 +316,59 @@ public class AASPTree {
         for (Map.Entry<String, Double> entry : conditionalProbabilities.entrySet()) {
             System.out.println(entry.getKey() + ": " + entry.getValue());
         }
+        // Initialize theta
+        double theta = 1.0;
+
+        // Multiply all conditional probabilities by theta
+        for (Map.Entry<String, Double> entry : conditionalProbabilities.entrySet()) {
+            conditionalProbabilities.put(entry.getKey(), entry.getValue() * theta);
+        }
+
+        // Multiply theta by marginal probability of the root node
+        if (marginalProbabilities.containsKey(rootKeyword)) {
+            theta *= marginalProbabilities.get(rootKeyword);
+        }
+
+        // Multiply theta by K
+        theta *= K;
+        System.out.println("Final Theta Value: " + theta);
+
+        return theta;
+    }
+    public Box localBoosting(Set<String> queryKeywords, Box queryBox, int K) {
+        Box bestBox = queryBox;
+        int bestK = K;
+        System.out.println("Original K is: " + bestK);
 
 
+        for (String keyword : queryKeywords) {
+            if (!aspTrees.containsKey(keyword)) {
+                continue;
+            }
+
+            ASPTree aspTree = aspTrees.get(keyword);
+            ASPNode node = aspTree.getNodeContaining(queryBox);
+
+
+            if (node.getBounds() != null) {
+
+                Set<StreamingObject> objSamples = getObjSamples(node.getBounds());
+                int newK = countRepresentativeSamples(objSamples, queryKeywords);
+
+                if (newK > bestK) {
+                    bestK = newK;
+                    bestBox = node.getBounds();
+
+                }
+            }
+        }
+
+        System.out.println("The best K found is: " + bestK);
+        System.out.println("The box for the best K is: " + bestBox.toString());
+        return bestBox;
     }
 
-    public Map<String, ASPTree> getAspTrees() {
-        return aspTrees;
-    }
 
-    public Box getSpace() {
-        return space;
-    }
+
+
 }

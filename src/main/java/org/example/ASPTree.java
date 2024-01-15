@@ -1,9 +1,5 @@
 package org.example;
-import util.AbstractDouble;
 import util.Box;
-import java.util.AbstractCollection;
-import java.util.ArrayList;
-import java.util.Iterator;
 
 public class ASPTree {
     protected ASPNode root = null;
@@ -12,10 +8,10 @@ public class ASPTree {
      * Creates an empty ASPTree with the bounds
      */
     public ASPTree(double minX, double minY, double maxX, double maxY){
-        this.root = new ASPNode(minX, minY, maxX, maxY);
+        this.root = new ASPNode(minX, minY, maxX, maxY, null);
     }
     public boolean put(double x, double y) {
-        if (this.root.put(x, y)) {
+        if (this.root.put(x, y, this)) {
             increaseSize();
             return true;
         }
@@ -23,7 +19,8 @@ public class ASPTree {
     }
     public ASPNode putAndGetNode(double x, double y) {
         // Call the existing put method
-        if (this.root.put(x, y)) {
+        if (this.root.put(x, y, this)) {
+            increaseSize();
             // If put is successful, return the node that contains the point
             return this.root.getNodeContaining(x, y);
         }
@@ -70,9 +67,30 @@ public class ASPTree {
     private void increaseSize() {
         this.size_n++;
     }
+    public int getSizeN() {
+        return size_n;
+    }
 
     public ASPNode getRoot() {
         return root;
+    }
+    /**
+     * Interface method to get the node containing a point in the ASPTree.
+     * @param x The x-coordinate of the point.
+     * @param y The y-coordinate of the point.
+     * @return The ASPNode containing the point, or null if no such node exists.
+     */
+    public ASPNode getNodeContaining(double x, double y) {
+        if (root == null) {
+            return null;
+        }
+        return root.getNodeContaining(x, y);
+    }
+    public ASPNode getNodeContaining(Box queryBox) {
+        if (root == null) {
+            return null;
+        }
+        return root.getNodeContaining(queryBox);
     }
 }
 
