@@ -22,7 +22,7 @@ public class AASPTree {
     private Map<String, Synopsis> termSynopses; // KMV: Map from terms to their synopses
     private static Map<String, Integer> termFrequencies; // RC: Frequencies of terms
     private static Map<String, ASPTree> aspTrees; // RC: ASP Trees for terms
-
+    private static int totalNumObjects;
     private static Box space; // RC: Spatial area
     private int totalTermFrequency; // RC: Total term frequency
     private static final double MEMORY_BUDGET_RATIO = 0.1;
@@ -44,7 +44,7 @@ public class AASPTree {
     public void update(StreamingObject object) {
         // KMV Update
         updateKMVSynopses(object);
-
+        incrementTotalNumObjects();
 
     }
     public void updateKMVSynopses(StreamingObject newObj) {
@@ -217,20 +217,29 @@ public class AASPTree {
     }
 
     public static double RCEstimate(Box queryRange, Set<String> queryTerms) {
-        double selectivityEstimate = 1.0;
+        int n = getTotalNumObjects(); // Use the counter as the total number of objects
+        double rho = queryRange.area() / space.area();
+        double product = 1.0;
 
         for (String term : queryTerms) {
-            double termEstimate;
-            if (aspTrees.containsKey(term) ) {
-                termEstimate = aspTrees.get(term).estimatePointsWithin(queryRange);
+            double Ai;
+            if (aspTrees.containsKey(term)) {
+                Ai = aspTrees.get(term).estimatePointsWithin(queryRange);
             } else {
-                double rho = queryRange.area() / space.area();
-                termEstimate = termFrequencies.getOrDefault(term, 0) * rho;
+                int ni = termFrequencies.getOrDefault(term, 0);
+                Ai = ni * rho;
             }
-            selectivityEstimate *= termEstimate;
+            product *= Ai / n;
         }
 
-        return selectivityEstimate;
+        return n * product;
+    }
+    public void incrementTotalNumObjects() {
+        totalNumObjects++;
+    }
+    // Getter method for insertionAttempts
+    public static int getTotalNumObjects() {
+        return totalNumObjects;
     }
 
     // Method to estimate selectivity
