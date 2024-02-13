@@ -157,4 +157,8 @@
         public ASPNode getParent() {
             return parent;
         }
+
+        public void IncrementCounter() {
+            Count++;
+        }
     }

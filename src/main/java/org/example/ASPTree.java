@@ -3,18 +3,25 @@ import util.Box;
 
 public class ASPTree {
     protected ASPNode root = null;
+    private CentroidTree centroidTree;
     private int size_n = 0;
     /**
      * Creates an empty ASPTree with the bounds
      */
     public ASPTree(double minX, double minY, double maxX, double maxY){
         this.root = new ASPNode(minX, minY, maxX, maxY, null);
+        // Initialize the BinarySearchTree with the ASP Tree root
+        this.centroidTree = new CentroidTree(this.root);
     }
     public boolean put(double x, double y) {
-        if (this.root.put(x, y, this)) {
+        // Use the CentroidTree to find the smallest ASPNode containing the point
+        ASPNode smallestNode = centroidTree.findSmallestBoxContainingPoint(x, y);
+        if(smallestNode != null){
+            smallestNode.IncrementCounter();
             increaseSize();
             return true;
         }
+
         return false;
     }
     public ASPNode putAndGetNode(double x, double y) {
