@@ -1,5 +1,11 @@
 package util;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import org.example.parser.Point;
 public class Box {
     public final double minX;
     public final double minY;
@@ -7,7 +13,8 @@ public class Box {
     public final double maxY;
     public final double centreX;
     public final double centreY;
-
+    private Set<Point> points = new HashSet<>();
+    private Map<String, Integer> keywordCounts = new HashMap<>();
     public Box(double minX, double minY, double maxX, double maxY) {
         this.minX = Math.min(minX, maxX);
         this.minY = Math.min(minY, maxY);
@@ -20,8 +27,8 @@ public class Box {
     public boolean contains(double x, double y) {
         return (x >= this.minX &&
                 y >= this.minY &&
-                x < this.maxX &&
-                y < this.maxY);
+                x <= this.maxX &&
+                y <= this.maxY);
     }
 
     // Method to check if this box fully contains another box
@@ -115,4 +122,12 @@ public class Box {
     public String toString() {
         return "upperLeft: (" + minX + ", " + minY + ") lowerRight: (" + maxX + ", " + maxY + ")";
     }
+    public Set<Point> getPoints() {
+        return points;
+    }
+
+    public Map<String, Integer> getKeywordCounts() {
+        return keywordCounts;
+    }
+
 }
