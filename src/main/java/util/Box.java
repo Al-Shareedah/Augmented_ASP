@@ -23,6 +23,7 @@ public class Box {
                 x < this.maxX &&
                 y < this.maxY);
     }
+
     // Method to check if this box fully contains another box
     public boolean contains(Box other) {
         return (other.minX >= this.minX &&

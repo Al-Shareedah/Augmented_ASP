@@ -11,9 +11,9 @@
     // counter for all nodes in the tree
     private int Count = 0;
     //Split threshold
-    private static final double alpha = 0.0;
+    private double alpha = 0.5;
     // Total size of all points inserted
-    private int size_n = 0;
+
     // Minimum resolution
     private static final double MIN_RESOLUTION = 1.0;
 
@@ -62,7 +62,7 @@
             }
             return null;
         }
-        private void refine() {
+        public void refine() {
             // Check if subdividing this node would result in a box smaller than the minimum resolution
             double halfWidth = (this.bounds.maxX - this.bounds.minX) / 2;
             double halfHeight = (this.bounds.maxY - this.bounds.minY) / 2;
@@ -71,13 +71,54 @@
                 // Do not subdivide further if either dimension of the new box would be below the minimum resolution
                 return;
             }
+
+            boolean hasExistingChildren = this.NW != null || this.NE != null || this.SE != null || this.SW != null;
+
+            // Temporarily store existing children if any
+            ASPNode[] existingChildren = {this.NW, this.NE, this.SE, this.SW};
+
+            // Reset existing children references before potentially creating new children
+            this.NW = this.NE = this.SE = this.SW = null;
+
+
             // Split the current node into four children
             this.NW = new ASPNode(this.bounds.minX, this.bounds.centreY, this.bounds.centreX, this.bounds.maxY, this);
             this.NE = new ASPNode(this.bounds.centreX, this.bounds.centreY, this.bounds.maxX, this.bounds.maxY, this);
             this.SE = new ASPNode(this.bounds.centreX, this.bounds.minY, this.bounds.maxX, this.bounds.centreY, this);
             this.SW = new ASPNode(this.bounds.minX, this.bounds.minY, this.bounds.centreX, this.bounds.centreY, this);
             this.hasChildren = true;
+
+            if (hasExistingChildren) {
+                // Check if all existing children fit within any one of the new children
+                ASPNode commonNewParent = null;
+                for (ASPNode potentialParent : new ASPNode[] {this.NW, this.NE, this.SE, this.SW}) {
+                    boolean allFit = true;
+                    for (ASPNode child : existingChildren) {
+                        if (child != null && !child.getBounds().contains(potentialParent.getBounds())) {
+                            allFit = false;
+                            break;
+                        }
+                    }
+                    if (allFit) {
+                        commonNewParent = potentialParent;
+                        break;
+                    }
+                }
+
+                // If a common new parent is found, set it as the parent for all existing children
+                if (commonNewParent != null) {
+                    for (ASPNode child : existingChildren) {
+                        if (child != null) {
+                            child.setParent(commonNewParent);
+                            // Depending on your implementation, you may also need to add the child
+                            // to the commonNewParent's list of children here.
+                        }
+                    }
+                }
+            }
+
         }
+
         /**
          * Calculates the size of the subtree rooted at this node.
          * @return the size of the subtree.
@@ -105,7 +146,7 @@
             return getChild(x, y).getNodeContaining(x, y);
         }
         // Method to find the smallest (leaf) node containing a point
-        private ASPNode getSmallestNodeContaining(double x, double y) {
+        public ASPNode getSmallestNodeContaining(double x, double y) {
             if (!this.hasChildren || !this.bounds.contains(x, y)) {
                 return this;
             }
@@ -134,6 +175,30 @@
 
             return null; // No suitable node found
         }
+        public boolean isMergeable() {
+            if (!this.hasChildren) {
+                return false;
+            }
+            int leafChildrenCount = 0;
+            if (this.NW != null && !this.NW.hasChildren) leafChildrenCount++;
+            if (this.NE != null && !this.NE.hasChildren) leafChildrenCount++;
+            if (this.SE != null && !this.SE.hasChildren) leafChildrenCount++;
+            if (this.SW != null && !this.SW.hasChildren) leafChildrenCount++;
+
+            return leafChildrenCount >= 3;
+        }
+
+        // New method to calculate the node's key
+        public int getKey() {
+            int childrenSum = 0;
+            if (this.NW != null) childrenSum += this.NW.getCount();
+            if (this.NE != null) childrenSum += this.NE.getCount();
+            if (this.SE != null) childrenSum += this.SE.getCount();
+            if (this.SW != null) childrenSum += this.SW.getCount();
+
+            return this.getCount() + childrenSum;
+        }
+
         public ASPNode getNW() {
             return NW;
         }
@@ -160,5 +225,33 @@
 
         public void IncrementCounter() {
             Count++;
+        }
+
+        public void setCount(int count) {
+            Count = count;
+        }
+
+        public void setNW(ASPNode NW) {
+            this.NW = NW;
+        }
+
+        public void setNE(ASPNode NE) {
+            this.NE = NE;
+        }
+
+        public void setSE(ASPNode SE) {
+            this.SE = SE;
+        }
+
+        public void setSW(ASPNode SW) {
+            this.SW = SW;
+        }
+
+        public void setParent(ASPNode parent) {
+            this.parent = parent;
+        }
+
+        public void setHasChildren(boolean hasChildren) {
+            this.hasChildren = hasChildren;
         }
     }
