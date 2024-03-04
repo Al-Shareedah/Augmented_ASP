@@ -127,5 +127,66 @@ public class AASPTree_test {
                 estimatedValue >= lowerBound && estimatedValue <= upperBound);
 
     }
+    @Test
+    public void testLocalBoosting2() throws Exception {
+        // Initialize AASPTree with a large enough space
+        AASPTree tree = new AASPTree(2000, new Box(-100, -100, 100, 100));
+        Set<String> queryKeywords = new HashSet<>(Arrays.asList("keyword1", "keyword2", "keyword3"));
+
+        // Predefined keywords for each object
+        String[][] keywordsArray = {
+                {"keyword1", "keyword2"}, // O1
+                {"keyword2", "keyword3"}, // O2
+                {"keyword1", "keyword2"}, // O3
+                {"keyword1", "keyword2", "keyword3"}, // O4
+                {"keyword1", "keyword2", "keyword3"}, // O5
+                {"keyword2", "keyword3"}, // O6
+                {"keyword1", "keyword2"}, // O7
+                {"keyword1", "keyword2", "keyword3", "keyword4"}, // O8
+                {"keyword3", "keyword4"}, // O9
+                {"keyword1", "keyword4"}, // O10
+                {"keyword1", "keyword2"}, // O11
+                {"keyword1"}, // O12
+                {"keyword1", "keyword2", "keyword3"}, // O13
+                {"keyword3"}, // O14
+                {"keyword3"}  // O15
+        };
+
+        // Generate 5 objects within R1
+        for (int i = 0; i < 5; i++) {
+            double x = -2.5 + 5 * Math.random(); // Random x within R1
+            double y = -2.5 + 5 * Math.random(); // Random y within R1
+            HashSet<String> keywords = new HashSet<>(Arrays.asList(keywordsArray[i]));
+            tree.update(new StreamingObject(keywords, x, y));
+        }
+
+        // Generate 10 objects within R2 but not R1
+        for (int i = 5; i < 15; i++) {
+            double x, y;
+            do {
+                x = -5 + 10 * Math.random(); // Random x within R2
+                y = -5 + 10 * Math.random(); // Random y within R2
+            } while (x >= -2.5 && x <= 2.5 && y >= -2.5 && y <= 2.5); // Ensure it's not within R1
+
+            HashSet<String> keywords = new HashSet<>(Arrays.asList(keywordsArray[i]));
+            tree.update(new StreamingObject(keywords, x, y));
+        }
+
+        int actualCount = 4;
+        System.out.println("The actual count of objects within R1 and R2 having all three query keywords is: " + actualCount);
+
+        // The rest of your test follows here, adjusting the query box if needed to target R1 or R2...
+        Box queryBox = new Box(-2.5, -2.5, 2.5, 2.5);
+        int K_threshold = 6;
+        // Perform selectivity estimation which internally calls local boosting if needed
+        double estimatedValue = tree.estimateSelectivity(queryBox, queryKeywords, K_threshold);
+        double marginOfError = 0.50; // 50% margin of error
+        double lowerBound = actualCount * (1 - marginOfError);
+        double upperBound = actualCount * (1 + marginOfError);
+
+        assertTrue("Estimated value should be within a high margin of error of the actual count",
+                estimatedValue >= lowerBound && estimatedValue <= upperBound);
+
+    }
 }
 

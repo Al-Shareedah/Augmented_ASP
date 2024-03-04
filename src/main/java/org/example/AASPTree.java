@@ -329,10 +329,12 @@ public class AASPTree {
         double theta = 1.0;
 
         // Multiply all conditional probabilities by theta
+        // Calculate the product of all conditional probabilities
+        double conditionalProbProduct = 1.0;
         for (Map.Entry<String, Double> entry : conditionalProbabilities.entrySet()) {
-            conditionalProbabilities.put(entry.getKey(), entry.getValue() * theta);
+            conditionalProbProduct *= entry.getValue();
         }
-
+        theta *= conditionalProbProduct;
         // Multiply theta by marginal probability of the root node
         if (marginalProbabilities.containsKey(rootKeyword)) {
             theta *= marginalProbabilities.get(rootKeyword);
