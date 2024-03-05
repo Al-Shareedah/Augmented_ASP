@@ -31,11 +31,13 @@ public class parser {
 
     private static final Map<String, Integer> hashtagFrequency = new HashMap<>();
     private static final Map<String, Integer> wordFrequency = new HashMap<>();
+    private static final Map<String, Integer> hashtagPairFrequency = new HashMap<>();
+    private static final Map<String, Integer> wordPairFrequency = new HashMap<>();
     private static final Pattern hashtagPattern = Pattern.compile("#\\w+");
     private static final Set<String> stopWords = new HashSet<>();
     // Data structures for new functionality
 
-    private static final double BOX_SIZE = 15.0;
+    private static final double BOX_SIZE = 5.0;
     private static final List<Box> grid = createGrid();
     public static void main(String[] args) {
         String filePath1 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data.txt";
@@ -62,7 +64,7 @@ public class parser {
         parseFile(filePath10);
         parseFile(filePath11);
 
-        writeRandomKeywordsOutput();
+        writeKeywordPairsOutput();
         String keywordPairsFilePath = "RandomKeywords.txt";
         findRelevantBoxes(keywordPairsFilePath);
     }
@@ -88,21 +90,55 @@ public class parser {
 
     public static void extractKeywords(String text) {
         Matcher matcher = hashtagPattern.matcher(text);
+        List<String> hashtags = new ArrayList<>();
+        List<String> words = new ArrayList<>();
 
-
-        // Process hashtags
+        // Process hashtags for individual frequency and collect them
         while (matcher.find()) {
             String hashtag = matcher.group();
             hashtagFrequency.put(hashtag, hashtagFrequency.getOrDefault(hashtag, 0) + 1);
+            hashtags.add(hashtag);
         }
 
-        // Split text and filter out stop words and URLs
-        String[] words = text.split("[\\s,.!?;:]+");
-        for (String word : words) {
-            // Check if word is a stop word, starts with "#", or is a URL
-            if (!word.isEmpty() && !word.startsWith("#") && !stopWords.contains(word)
-                    && !word.contains("//t") && !word.startsWith("https")) {
+        // Split text and process for individual word frequency (excluding URLs and stop words)
+        String[] splitWords = text.split("[\\s,.!?;:]+");
+        for (String word : splitWords) {
+            if (!word.isEmpty() && !word.startsWith("#") && !stopWords.contains(word.toLowerCase())
+                    && !word.contains("//t") && !word.matches("https?://.*")) {
                 wordFrequency.put(word, wordFrequency.getOrDefault(word, 0) + 1);
+                words.add(word);
+            }
+        }
+
+        // Process hashtag pairs
+        for (int i = 0; i < hashtags.size(); i++) {
+            for (int j = i + 1; j < hashtags.size(); j++) {
+                String first = hashtags.get(i);
+                String second = hashtags.get(j);
+                if (first.compareTo(second) > 0) {
+                    // Swap to ensure lexical order
+                    String temp = first;
+                    first = second;
+                    second = temp;
+                }
+                String pairKey = first + "," + second;
+                hashtagPairFrequency.put(pairKey, hashtagPairFrequency.getOrDefault(pairKey, 0) + 1);
+            }
+        }
+
+        // Process word pairs, excluding hashtags, URLs, and stop words
+        for (int i = 0; i < words.size(); i++) {
+            for (int j = i + 1; j < words.size(); j++) {
+                String first = words.get(i);
+                String second = words.get(j);
+                if (first.compareTo(second) > 0) {
+                    // Swap to ensure lexical order
+                    String temp = first;
+                    first = second;
+                    second = temp;
+                }
+                String pairKey = first + "," + second;
+                wordPairFrequency.put(pairKey, wordPairFrequency.getOrDefault(pairKey, 0) + 1);
             }
         }
     }
@@ -153,6 +189,44 @@ public class parser {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+    private static void writeKeywordPairsOutput() {
+        // Printing top 10 pairs of hashtags to the console
+        System.out.println("Top 10 Hashtag Pairs:");
+        hashtagPairFrequency.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(10)
+                .forEach(entry -> {
+                    String[] hashtags = entry.getKey().split(",");
+                    System.out.println(hashtags[0] + ", " + hashtags[1] + ": " + entry.getValue());
+                });
+        // Printing top 10 word pairs to the console
+        System.out.println("\nTop 10 Word Pairs:");
+        wordPairFrequency.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(10)
+                .forEach(entry -> {
+                    String[] words = entry.getKey().split(",");
+                    System.out.println(words[0] + ", " + words[1] + ": " + entry.getValue());
+                });
+
+        // Writing top pairs of hashtags to the file
+        String outputFilePath = "RandomKeywords.txt";
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath))) {
+            hashtagPairFrequency.entrySet().stream()
+                    .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                    .limit(10) // Assuming you want the top 10 pairs of hashtags that are frequently found together
+                    .forEach(entry -> {
+                        try {
+                            String[] hashtags = entry.getKey().split(",");
+                            writer.write(hashtags[0] + ", " + hashtags[1] + "\n");
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    });
+        } catch (IOException e) {
+            System.err.println("Error writing to " + outputFilePath + ": " + e.getMessage());
         }
     }
 

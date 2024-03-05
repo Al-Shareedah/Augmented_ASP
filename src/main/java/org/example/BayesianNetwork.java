@@ -219,7 +219,7 @@ public class BayesianNetwork {
         // Use the RCSelectivity method to estimate the count of the keyword
 
         Set<String> queryTerms = new HashSet<>(Collections.singletonList(keyword));
-        double estimatedCount = AASPTree.RCEstimate(queryRange, queryTerms);
+        //double estimatedCount = AASPTree.RCEstimate(queryRange, queryTerms);
 
         // Manual count of the keyword within the query range
         int manualCount = 0;
@@ -230,7 +230,7 @@ public class BayesianNetwork {
         }
         // Print the manual count
         System.out.println("Manual count of keyword '" + keyword + "' within the query range: " + manualCount);
-        System.out.println("Estimated count using RCEstimate '" + keyword + "' within the query range " + estimatedCount);
+        //System.out.println("Estimated count using RCEstimate '" + keyword + "' within the query range " + estimatedCount);
         // Calculate the marginal probability
         return (double) manualCount / objects.size();
     }

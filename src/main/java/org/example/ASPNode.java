@@ -10,8 +10,6 @@
     private ASPNode SW = null;
     // counter for all nodes in the tree
     private int Count = 0;
-    //Split threshold
-    private double alpha = 0.5;
     // Total size of all points inserted
 
     // Minimum resolution
@@ -32,12 +30,12 @@
         }
 
 
-        public boolean put(double x, double y, ASPTree tree) {
+        public boolean put(double x, double y, ASPTree tree, double alpha) {
             if (!this.bounds.contains(x, y)) {
                 return false;
             }
             if (this.hasChildren) {
-                return getChild(x, y).put(x, y, tree);
+                return getChild(x, y).put(x, y, tree, alpha);
             }
 
             double split_threshold = alpha * tree.getSizeN();

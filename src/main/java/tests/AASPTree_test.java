@@ -112,7 +112,7 @@ public class AASPTree_test {
 
 
         // Determine initial representative sample count (K) for the query box
-        int initialK = tree.countRepresentativeSamples(tree.getObjSamples(queryBox), new HashSet<>(Arrays.asList("keyword1", "keyword2")));
+        int initialK = tree.countRepresentativeSamples(tree.getObjSamples(queryBox, queryKeywords), new HashSet<>(Arrays.asList("keyword1", "keyword2")));
 
         // Set a K threshold (for example, slightly higher than initialK to test boosting)
         int K_threshold = initialK + 1;

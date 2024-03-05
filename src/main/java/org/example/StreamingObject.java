@@ -29,6 +29,9 @@ public class StreamingObject {
         return x;
     }
 
+    public Set<String> getKeywords() {
+        return keywords;
+    }
 
     public double getY() {
         return y;
