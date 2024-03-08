@@ -122,7 +122,7 @@ public class AASPTree {
                 totalTermFrequency++;
 
                 boolean isUnderMemoryBudget = rceASPTrees.size() <= memoryBudget;
-                int threshold = (int)(EPSILON * totalTermFrequency);
+                double threshold = EPSILON * totalTermFrequency;
                 if (isUnderMemoryBudget || termFrequencies.get(term) > threshold) {
                     if (!rceASPTrees.containsKey(term)) {
                         // If the term doesn't have an ASP Tree yet, create one with alpha set to 0
@@ -280,16 +280,16 @@ public class AASPTree {
     }
 
     public double RCEstimate(Box queryRange, Set<String> queryTerms) {
-        int n = totalTermFrequency; // Use the counter as the total number of objects
+        int n = totalNumObjects; // Use the counter as the total number of objects
         double rho = queryRange.area() / space.area();
         double product = 1.0;
 
         for (String term : queryTerms) {
             double Ai;
-            if (aspTrees.containsKey(term)) {
+            if (rceASPTrees.containsKey(term)) {
                 Ai = rceASPTrees.get(term).estimatePointsWithin(queryRange);
             } else {
-                int ni = termFrequencies.getOrDefault(term, 0);
+                double ni = termFrequencies.getOrDefault(term, 0);
                 Ai = ni * rho;
             }
             product *= Ai / n;

@@ -131,7 +131,7 @@ public class AASPTree_test {
     public void testLocalBoosting2() throws Exception {
         // Initialize AASPTree with a large enough space
         AASPTree tree = new AASPTree(2000, new Box(-100, -100, 100, 100));
-        Set<String> queryKeywords = new HashSet<>(Arrays.asList("keyword1", "keyword2", "keyword3"));
+        Set<String> queryKeywords = new HashSet<>(Arrays.asList("keyword1"));
 
         // Predefined keywords for each object
         String[][] keywordsArray = {

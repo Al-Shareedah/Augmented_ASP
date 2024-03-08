@@ -74,28 +74,37 @@ public class ASPTree {
      * @return The estimated number of points within the region at this node.
      */
     private double estimatePointsWithin(ASPNode node, Box R) {
-        if (node == null || !node.getBounds().intersects(R)) {
-            // If the node is null or the search region does not intersect with the node's bounding box, return 0.
-            return 0;
-        } else if (node.isHasChildren()) {
-            // If the node has children, recursively estimate the count for each child.
-            double estimate = 0;
-            estimate += estimatePointsWithin(node.getNW(), R);
-            estimate += estimatePointsWithin(node.getNE(), R);
-            estimate += estimatePointsWithin(node.getSE(), R);
-            estimate += estimatePointsWithin(node.getSW(), R);
-            return estimate;
-        } else {
-            // If the node is a leaf, calculate the estimate for this node.
-            Box intersection = node.getBounds().intersection(R);
-            if (intersection != null) {
-                double nodeArea = node.getBounds().area();
-                double intersectionArea = intersection.area();
-                return node.getCount() * (intersectionArea / nodeArea);
-            }
+        // Base case: if the node is null, return 0
+        if (node == null) {
             return 0;
         }
+
+        // Calculate the intersection of the node's bounding box with the region
+        Box intersection = node.getBounds().intersection(R);
+        if (intersection == null) {
+            // No intersection, so this node does not contribute to the sum
+            return 0;
+        }
+
+        double intersectionArea = intersection.area();
+        double nodeArea = node.getBounds().area();
+
+        // Calculate the current node's contribution to the estimate
+        double currentNodeEstimate = node.getCount() * (intersectionArea / nodeArea);
+
+        // Recursively calculate the estimates for child nodes and sum them up
+        double childrenEstimate = 0;
+        if (node.isHasChildren()) {
+            childrenEstimate += estimatePointsWithin(node.getNW(), R);
+            childrenEstimate += estimatePointsWithin(node.getNE(), R);
+            childrenEstimate += estimatePointsWithin(node.getSE(), R);
+            childrenEstimate += estimatePointsWithin(node.getSW(), R);
+        }
+
+        // Return the sum of the current node's estimate and the children's estimates
+        return currentNodeEstimate + childrenEstimate;
     }
+
     private void checkAndMergeIfRequired() {
         if (!mergeHeap.isEmpty()) {
             ASPNode headNode = mergeHeap.peek(); // Get the head of the heap without removing it

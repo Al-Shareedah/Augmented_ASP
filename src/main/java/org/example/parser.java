@@ -37,7 +37,7 @@ public class parser {
     private static final Set<String> stopWords = new HashSet<>();
     // Data structures for new functionality
 
-    private static final double BOX_SIZE = 5.0;
+    private static final double BOX_SIZE = 15.0;
     private static final List<Box> grid = createGrid();
     public static void main(String[] args) {
         String filePath1 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data.txt";
@@ -64,7 +64,7 @@ public class parser {
         parseFile(filePath10);
         parseFile(filePath11);
 
-        writeKeywordPairsOutput();
+        writeRandomKeywordsOutput();
         String keywordPairsFilePath = "RandomKeywords.txt";
         findRelevantBoxes(keywordPairsFilePath);
     }
@@ -154,49 +154,40 @@ public class parser {
     }
 
     public static void writeRandomKeywordsOutput() {
-        // Print the top 10 hashtags
+        // Print the top 10 Hashtags only
         System.out.println("Top 10 Hashtags:");
         hashtagFrequency.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-                .limit(10)
-                .forEach(entry -> System.out.println(entry.getKey() + ": " + entry.getValue()));
-
-        // Print the top 10 words
-        System.out.println("\nTop 10 Words:");
-        wordFrequency.entrySet().stream()
-                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-                .limit(10)
+                .limit(20)
                 .forEach(entry -> System.out.println(entry.getKey() + ": " + entry.getValue()));
 
         String outputFilePath = "RandomKeywords.txt";
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath))) {
+            // Sort eligibleHashtags by their frequency first
             List<String> eligibleHashtags = hashtagFrequency.entrySet().stream()
-                    .filter(entry -> entry.getValue() > 300)
+                    .filter(entry -> entry.getValue() > 100)
+                    .sorted(Map.Entry.<String, Integer>comparingByValue().reversed()) // Sort based on frequency
                     .map(Map.Entry::getKey)
                     .collect(Collectors.toList());
 
-            List<String> eligibleWords = wordFrequency.entrySet().stream()
-                    .filter(entry -> entry.getValue() > 3000)
-                    .map(Map.Entry::getKey)
-                    .collect(Collectors.toList());
 
-            Random rand = new Random();
-            int maxLines = Math.min(eligibleHashtags.size(), eligibleWords.size());
-            for (int i = 0; i < 10; i++) {
-                String hashtag = eligibleHashtags.get(rand.nextInt(eligibleHashtags.size()));
-                String word = eligibleWords.get(rand.nextInt(eligibleWords.size()));
-                writer.write(hashtag + ", " + word + "\n");
+            for (int i = 0; i < 20; i++) {
+                if (i < eligibleHashtags.size()) { // Ensure we don't exceed the available count
+                    String hashtag = eligibleHashtags.get(i);
+                    writer.write(hashtag + "\n"); // Write hashtags in the sorted order
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
     private static void writeKeywordPairsOutput() {
         // Printing top 10 pairs of hashtags to the console
         System.out.println("Top 10 Hashtag Pairs:");
         hashtagPairFrequency.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-                .limit(10)
+                .limit(15)
                 .forEach(entry -> {
                     String[] hashtags = entry.getKey().split(",");
                     System.out.println(hashtags[0] + ", " + hashtags[1] + ": " + entry.getValue());
@@ -212,11 +203,12 @@ public class parser {
                 });
 
         // Writing top pairs of hashtags to the file
+        // Writing top pairs of hashtags to the file
         String outputFilePath = "RandomKeywords.txt";
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath))) {
             hashtagPairFrequency.entrySet().stream()
                     .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-                    .limit(10) // Assuming you want the top 10 pairs of hashtags that are frequently found together
+                    .limit(15) // Assuming you want the top 10 pairs of hashtags that are frequently found together
                     .forEach(entry -> {
                         try {
                             String[] hashtags = entry.getKey().split(",");
@@ -231,6 +223,7 @@ public class parser {
     }
 
 
+
     private static void loadStopWords(String filePath) {
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
             String line;
@@ -242,32 +235,31 @@ public class parser {
         }
     }
     public static void findRelevantBoxes(String keywordPairsFilePath) {
-        List<KeywordPair> keywordPairs = loadKeywordPairs(keywordPairsFilePath);
+        List<String> hashtags = loadKeywords(keywordPairsFilePath); // Update for single hashtags
 
-        // Iterate over keyword pairs and find relevant boxes
-        for (KeywordPair pair : keywordPairs) {
-            Box bestBox = findBoxWithHighestCount(pair); // Implement this method
+        // Iterate over hashtags and find relevant boxes
+        for (String hashtag : hashtags) {
+            Box bestBox = findBoxWithHighestCountForHashtag(hashtag); // Update the method call
             if (bestBox != null) {
-                int totalObjects = bestBox.getPoints().size(); // Total objects in the box
-                int matchingObjects = calculateMatchingCountForBox(bestBox, pair);
+                int totalObjects = bestBox.getPoints().size();
+                int matchingObjects = calculateMatchingCountForBoxWithHashtag(bestBox, hashtag);
 
-                System.out.println("Best Box for Keyword Pair: " + pair.term1 + ", " + pair.term2);
+                System.out.println("Best Box for Hashtag: " + hashtag);
                 System.out.println("Relevant Box: " + bestBox);
                 System.out.println("Number of Objects: " + totalObjects);
                 System.out.println("Number of Matching Objects: " + matchingObjects);
                 System.out.println("-------------------------");
             } else {
-                System.out.println("No relevant box found for keyword pair: " + pair.term1 + ", " + pair.term2);
+                System.out.println("No relevant box found for hashtag: " + hashtag);
             }
         }
     }
-    private static Box findBoxWithHighestCount(KeywordPair pair) {
+    private static Box findBoxWithHighestCountForHashtag(String hashtag) {
         Box bestBox = null;
         int maxCount = 0;
 
         for (Box box : grid) {
-            int count = calculateMatchingCountForBox(box, pair);
-
+            int count = calculateMatchingCountForBoxWithHashtag(box, hashtag);
             if (count > maxCount) {
                 bestBox = box;
                 maxCount = count;
@@ -276,18 +268,18 @@ public class parser {
         return bestBox;
     }
 
-    private static int calculateMatchingCountForBox(Box box, KeywordPair pair) {
+    // New method based on your existing calculateMatchingCountForBox
+    private static int calculateMatchingCountForBoxWithHashtag(Box box, String hashtag) {
         int count = 0;
 
         for (Point point : box.getPoints()) {
-            if (point.keywords.contains(pair.term1) || point.keywords.contains(pair.term2)) {
+            if (point.keywords.contains(hashtag)) {
                 count++;
             }
         }
 
         return count;
     }
-
     public static void processTextToInsertInGrid(Point point, String text) {
         Box containingBox = findContainingBox(point);
         List<String> keywords = extractKeywordsFromText(text);
@@ -313,23 +305,17 @@ public class parser {
         System.err.println("Warning: No containing box found for point: " + point);
         return null;
     }
-    public static List<KeywordPair> loadKeywordPairs(String keywordPairsFilePath) {
-        List<KeywordPair> pairs = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(new FileReader(keywordPairsFilePath))) {
+    private static List<String> loadKeywords(String filePath) {
+        List<String> keywords = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                String[] parts = line.split(", ");
-                if (parts.length == 2) {
-                    pairs.add(new KeywordPair(parts[0], parts[1]));
-                } else {
-                    // Handle lines that don't have the correct format (optional)
-                    System.err.println("Invalid line format in keyword pairs file: " + line);
-                }
+                keywords.add(line.trim()); // Add the cleaned-up hashtag
             }
         } catch (IOException e) {
-            System.err.println("Error reading keyword pairs file: " + e.getMessage());
+            e.printStackTrace();
         }
-        return pairs;
+        return keywords;
     }
     private static List<Box> createGrid() {
         List<Box> grid = new ArrayList<>();
@@ -371,6 +357,70 @@ public class parser {
             }
         }
         return keywords;
+    }
+    public static void findRelevantPairsBoxes(String keywordPairsFilePath) {
+        List<KeywordPair> keywordPairs = loadKeywordPairs(keywordPairsFilePath);
+
+        // Iterate over keyword pairs and find relevant boxes
+        for (KeywordPair pair : keywordPairs) {
+            Box bestBox = findBoxWithHighestCount(pair); // Implement this method
+            if (bestBox != null) {
+                int totalObjects = bestBox.getPoints().size(); // Total objects in the box
+                int matchingObjects = calculateMatchingCountForBoxPairs(bestBox, pair);
+
+                System.out.println("Best Box for Keyword Pair: " + pair.term1 + ", " + pair.term2);
+                System.out.println("Relevant Box: " + bestBox);
+                System.out.println("Number of Objects: " + totalObjects);
+                System.out.println("Number of Matching Objects: " + matchingObjects);
+                System.out.println("-------------------------");
+            } else {
+                System.out.println("No relevant box found for keyword pair: " + pair.term1 + ", " + pair.term2);
+            }
+        }
+    }
+    private static List<KeywordPair> loadKeywordPairs(String filePath) {
+        List<KeywordPair> keywordPairs = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] terms = line.trim().split(","); // Assume CSV format
+                if (terms.length == 2) {
+                    keywordPairs.add(new KeywordPair(terms[0].trim(), terms[1].trim()));
+                } else {
+                    // Handle lines that don't have two keywords
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return keywordPairs;
+    }
+
+    private static Box findBoxWithHighestCount(KeywordPair pair) {
+        Box bestBox = null;
+        int maxCount = 0;
+
+        for (Box box : grid) {
+            int count = calculateMatchingCountForBoxPairs(box, pair);
+
+            if (count > maxCount) {
+                bestBox = box;
+                maxCount = count;
+            }
+        }
+        return bestBox;
+    }
+
+    private static int calculateMatchingCountForBoxPairs(Box box, KeywordPair pair) {
+        int count = 0;
+
+        for (Point point : box.getPoints()) {
+            if (point.keywords.contains(pair.term1) || point.keywords.contains(pair.term2)) {
+                count++;
+            }
+        }
+
+        return count;
     }
 
 
