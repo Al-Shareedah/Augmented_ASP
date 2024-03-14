@@ -9,8 +9,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 public class JsonParser {
     public static void main(String[] args) {
-        String sourceFilePath = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data11.txt"; // Update this to your JSON file path
-        String outputFilePath = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data11.txt"; // Update this to your desired output file path
+        String sourceFilePath = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data.txt"; // Update this to your JSON file path
+        String outputFilePath = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data50.txt"; // Update this to your desired output file path
 
         try {
             // Read the JSON file content

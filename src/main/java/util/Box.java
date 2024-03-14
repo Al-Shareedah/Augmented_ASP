@@ -1,9 +1,6 @@
 package util;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.example.parser.Point;
 public class Box {
@@ -13,7 +10,7 @@ public class Box {
     public final double maxY;
     public final double centreX;
     public final double centreY;
-    private Set<Point> points = new HashSet<>();
+    private List<Point> points = new ArrayList<>();
     private Map<String, Integer> keywordCounts = new HashMap<>();
     public Box(double minX, double minY, double maxX, double maxY) {
         this.minX = Math.min(minX, maxX);
@@ -122,7 +119,7 @@ public class Box {
     public String toString() {
         return "upperLeft: (" + minX + ", " + minY + ") lowerRight: (" + maxX + ", " + maxY + ")";
     }
-    public Set<Point> getPoints() {
+    public List<Point> getPoints() {
         return points;
     }
 

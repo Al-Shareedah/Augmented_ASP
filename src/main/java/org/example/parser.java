@@ -5,6 +5,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 import org.example.Point;
 import util.Box;
 
@@ -37,19 +42,19 @@ public class parser {
     private static final Set<String> stopWords = new HashSet<>();
     // Data structures for new functionality
 
-    private static final double BOX_SIZE = 15.0;
+    private static final double BOX_SIZE = 5.0;
     private static final List<Box> grid = createGrid();
     public static void main(String[] args) {
-        String filePath1 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data.txt";
-        String filePath2 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data1.txt";
-        String filePath3 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data2.txt";
-        String filePath4 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data3.txt";
-        String filePath5 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data4.txt";
-        String filePath7 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data7.txt";
-        String filePath8 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data8.txt";
-        String filePath9 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data9.txt";
-        String filePath10 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data10.txt";
-        String filePath11 = "C:/Users/fengw/OneDrive/Documents/JSON_SpatioTextual_data11.txt";
+        String filePath1 = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data.txt";
+        String filePath2 = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data2.txt";
+        String filePath3 = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data3.txt";
+        String filePath4 = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data4.txt";
+        String filePath5 = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data5.txt";
+        String filePath7 = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data6.txt";
+        String filePath8 = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data7.txt";
+        String filePath9 = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data8.txt";
+        String filePath10 = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data9.txt";
+        String filePath11 = "C:/Users/fengw/OneDrive/Documents/Dataset/JSON_data10.txt";
 
         String stopWordsFilePath = "C:/Users/fengw/OneDrive/Documents/stopwords.txt"; // Update this to your stop words file path
         loadStopWords(stopWordsFilePath);
@@ -64,31 +69,94 @@ public class parser {
         parseFile(filePath10);
         parseFile(filePath11);
 
+        printHighDensityBoxes();
+        List<Box> selectedBoxes = selectBoxesWithMoreThan100Points();
+        extractAndWriteRandomPoints(selectedBoxes, "workload3.txt");
+
+
         writeRandomKeywordsOutput();
         String keywordPairsFilePath = "RandomKeywords.txt";
         findRelevantBoxes(keywordPairsFilePath);
+
     }
 
     public static void parseFile(String filePath) {
-        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (isCoordinateLine(line)) {
-                    String[] parts = line.split("\t", 3);
-                    double longitude = Double.parseDouble(parts[0]);
-                    double latitude = Double.parseDouble(parts[1]);
-                    String text = parts.length > 2 ? parts[2] : "";
-                    extractKeywords(text); // This method will now update hashtagFrequency and wordFrequency
-                    Point point = new Point(longitude, latitude);
-                    processTextToInsertInGrid(point, text);
+        try {
+            // New approach to read JSON content
+            String content = new String(Files.readAllBytes(Paths.get(filePath)));
+            String[] jsonStrings = content.split("\n");
+
+            ObjectMapper mapper = new ObjectMapper();
+
+            for (String jsonString : jsonStrings) {
+                if (jsonString.contains("\"limit\":") || !jsonString.startsWith("{")) {
+                    continue;
                 }
+
+                JsonNode rootNode = mapper.readTree(jsonString);
+                JsonNode coordinatesNode = rootNode.path("coordinates").path("coordinates");
+
+                double longitude, latitude;
+                String text = rootNode.path("text").asText("");
+
+                if (!coordinatesNode.isMissingNode() && coordinatesNode.size() > 0) {
+                    longitude = coordinatesNode.get(0).asDouble();
+                    latitude = coordinatesNode.get(1).asDouble();
+                } else {
+                    JsonNode boundingBoxNode = rootNode.path("place").path("bounding_box").path("coordinates").get(0);
+                    if (boundingBoxNode != null && boundingBoxNode.size() > 0) {
+                        double[] centroid = calculateCentroid(boundingBoxNode);
+                        longitude = centroid[0];
+                        latitude = centroid[1];
+                    } else {
+                        continue;
+                    }
+                }
+
+                Point point = new Point(longitude, latitude);
+                // Assume extractKeywords(text) updates point.keywords
+                extractKeywords(text, point); // Remember to adjust extractKeywords to add keywords to the point if necessary
+                insertPointIntoGrid(point);
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public static void extractKeywords(String text) {
+    private static double[] calculateCentroid(JsonNode polygon) {
+        double xSum = 0, ySum = 0;
+        int pointCount = polygon.size();
+
+        for (JsonNode point : polygon) {
+            double x = point.get(0).asDouble();
+            double y = point.get(1).asDouble();
+            xSum += x;
+            ySum += y;
+        }
+
+        return new double[]{xSum / pointCount, ySum / pointCount};
+    }
+    private static void insertPointIntoGrid(Point point) {
+        // Assuming minLongitude = -180, maxLongitude = 180, minLatitude = -90, maxLatitude = 90 for the entire grid
+        double minLongitude = -180.0;
+        double minLatitude = -90.0;
+
+        // Calculate the indices for the box in which the point should be placed
+        int indexX = (int) Math.floor((point.longitude - minLongitude) / BOX_SIZE);
+        int indexY = (int) Math.floor((point.latitude - minLatitude) / BOX_SIZE);
+
+        // Calculate the single index based on indexX and indexY if grid is a linear list
+        int gridWidth = (int) Math.ceil((360.0) / BOX_SIZE);
+        int boxIndex = indexY * gridWidth + indexX;
+
+        // Insert the point into the correct box
+        if (boxIndex >= 0 && boxIndex < grid.size()) {
+            Box box = grid.get(boxIndex);
+            box.getPoints().add(point);
+        }
+    }
+
+    public static void extractKeywords(String text, parser.Point point) {
         Matcher matcher = hashtagPattern.matcher(text);
         List<String> hashtags = new ArrayList<>();
         List<String> words = new ArrayList<>();
@@ -98,6 +166,7 @@ public class parser {
             String hashtag = matcher.group();
             hashtagFrequency.put(hashtag, hashtagFrequency.getOrDefault(hashtag, 0) + 1);
             hashtags.add(hashtag);
+            point.keywords.add(hashtag);
         }
 
         // Split text and process for individual word frequency (excluding URLs and stop words)
@@ -109,6 +178,8 @@ public class parser {
                 words.add(word);
             }
         }
+        /*
+
 
         // Process hashtag pairs
         for (int i = 0; i < hashtags.size(); i++) {
@@ -141,6 +212,8 @@ public class parser {
                 wordPairFrequency.put(pairKey, wordPairFrequency.getOrDefault(pairKey, 0) + 1);
             }
         }
+
+         */
     }
 
 
@@ -235,23 +308,42 @@ public class parser {
         }
     }
     public static void findRelevantBoxes(String keywordPairsFilePath) {
-        List<String> hashtags = loadKeywords(keywordPairsFilePath); // Update for single hashtags
+        // Load hashtags with frequency above 50
+        List<String> filteredHashtags = hashtagFrequency.entrySet().stream()
+                .filter(entry -> entry.getValue() > 50)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
 
-        // Iterate over hashtags and find relevant boxes
-        for (String hashtag : hashtags) {
-            Box bestBox = findBoxWithHighestCountForHashtag(hashtag); // Update the method call
-            if (bestBox != null) {
-                int totalObjects = bestBox.getPoints().size();
-                int matchingObjects = calculateMatchingCountForBoxWithHashtag(bestBox, hashtag);
+        try (PrintWriter writer = new PrintWriter(new FileOutputStream("workload2.txt", true))) { // Append to file
+            for (String hashtag : filteredHashtags) {
+                Box bestBox = findBoxWithHighestCountForHashtag(hashtag);
+                if (bestBox != null) {
+                    // Using a set to track unique points based on a string key
+                    Set<String> uniquePoints = new HashSet<>();
+                    List<Point> uniquePointsWithHashtag = new ArrayList<>();
 
-                System.out.println("Best Box for Hashtag: " + hashtag);
-                System.out.println("Relevant Box: " + bestBox);
-                System.out.println("Number of Objects: " + totalObjects);
-                System.out.println("Number of Matching Objects: " + matchingObjects);
-                System.out.println("-------------------------");
-            } else {
-                System.out.println("No relevant box found for hashtag: " + hashtag);
+                    for (Point point : bestBox.getPoints()) {
+                        if (point.keywords.contains(hashtag)) {
+                            // Create a unique string key for the point
+                            String key = point.latitude + "," + point.longitude;
+                            // Add to the list only if the key is unique
+                            if (uniquePoints.add(key)) {
+                                uniquePointsWithHashtag.add(point);
+                                if (uniquePointsWithHashtag.size() == 5) {
+                                    break; // Stop when five unique points are found
+                                }
+                            }
+                        }
+                    }
+
+                    // Write the unique points to the file
+                    for (Point point : uniquePointsWithHashtag) {
+                        writer.printf("%f\t%f\n", point.latitude, point.longitude);
+                    }
+                }
             }
+        } catch (FileNotFoundException e) {
+            System.err.println("Error writing to workload2.txt: " + e.getMessage());
         }
     }
     private static Box findBoxWithHighestCountForHashtag(String hashtag) {
@@ -319,18 +411,13 @@ public class parser {
     }
     private static List<Box> createGrid() {
         List<Box> grid = new ArrayList<>();
-
-        // Placeholder values - Replace with your actual bounds
         double minLongitude = -180.0;
         double maxLongitude = 180.0;
         double minLatitude = -90.0;
         double maxLatitude = 90.0;
-
-        // Calculate grid dimensions to cover the specified area
         int numBoxesX = (int) Math.ceil((maxLongitude - minLongitude) / BOX_SIZE);
         int numBoxesY = (int) Math.ceil((maxLatitude - minLatitude) / BOX_SIZE);
 
-        // Generate the boxes
         for (int i = 0; i < numBoxesY; i++) {
             double startY = minLatitude + i * BOX_SIZE;
             for (int j = 0; j < numBoxesX; j++) {
@@ -339,7 +426,6 @@ public class parser {
                 grid.add(box);
             }
         }
-
         return grid;
     }
     public static List<String> extractKeywordsFromText(String text) {
@@ -422,7 +508,48 @@ public class parser {
 
         return count;
     }
+    public static void printHighDensityBoxes() {
+        int count = 0;
+        for (Box box : grid) {
+            if (box.getPoints().size() > 100) {
+                System.out.println("Box: " + box + " has " + box.getPoints().size() + " points.");
+                count++;
+            }
+        }
+        System.out.println("Total boxes with more than 100 points: " + count);
+    }
 
+    private static List<Box> selectBoxesWithMoreThan100Points() {
+        List<Box> selectedBoxes = new ArrayList<>();
+        for (Box box : grid) {
+            if (box.getPoints().size() > 100) {
+                selectedBoxes.add(box);
+            }
+        }
+        return selectedBoxes;
+    }
 
+    private static void extractAndWriteRandomPoints(List<Box> boxes, String filename) {
+        Set<String> writtenPoints = new HashSet<>();
+        try (PrintWriter writer = new PrintWriter(new FileOutputStream(filename))) {
+            for (Box box : boxes) {
+                List<Point> points = new ArrayList<>(box.getPoints());
+                Collections.shuffle(points); // Randomly shuffle the list of points
+                int pointsToWrite = Math.min(20, points.size()); // Select 20 or fewer points
+                for (Point point : points) {
+                    // Create a unique key for each point
+                    String pointKey = point.latitude + "," + point.longitude;
+                    // Check if the point is already written, if not, write to the file
+                    if (!writtenPoints.contains(pointKey)) {
+                        writer.printf("%f\t%f\n", point.latitude, point.longitude);
+                        writtenPoints.add(pointKey); // Mark this point as written
+                        if (--pointsToWrite == 0) break; // Decrement pointsToWrite and check if we are done
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
 }
